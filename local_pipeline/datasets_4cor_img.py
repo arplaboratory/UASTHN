@@ -54,6 +54,7 @@ class homo_dataset(data.Dataset):
                     self.permute_type.append("resize")
         base_transform = transforms.Compose(
             [
+                transforms.CenterCrop([self.args.database_size, self.args.database_size]),
                 transforms.Resize([self.args.resize_width, self.args.resize_width]),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=imagenet_mean, std=imagenet_std),
@@ -61,7 +62,7 @@ class homo_dataset(data.Dataset):
         )
         base_transform_ori = transforms.Compose(
             [
-                transforms.Resize([self.args.database_size, self.args.database_size]),
+                transforms.CenterCrop([self.args.database_size, self.args.database_size]),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=imagenet_mean, std=imagenet_std),
             ]
