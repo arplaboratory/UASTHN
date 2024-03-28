@@ -61,6 +61,7 @@ class homo_dataset(data.Dataset):
         )
         base_transform_ori = transforms.Compose(
             [
+                transforms.Resize([self.args.database_size, self.args.database_size]),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=imagenet_mean, std=imagenet_std),
             ]
@@ -176,6 +177,24 @@ class homo_dataset(data.Dataset):
             four_point_1[:, 0, 1] = t_tensor + top_right_resize2
             four_point_1[:, 1, 0] = t_tensor + bottom_left_resize2
             four_point_1[:, 1, 1] = t_tensor + bottom_right_resize2
+        elif self.args.database_size == 2048:
+            top_left_resize3 = torch.Tensor([self.args.resize_width/8*3, self.args.resize_width/8*3])
+            top_right_resize3 = torch.Tensor([self.args.resize_width - self.args.resize_width/8*3 - 1, self.args.resize_width/8*3])
+            bottom_left_resize3 = torch.Tensor([self.args.resize_width/8*3, self.args.resize_width - self.args.resize_width/8*3 - 1])
+            bottom_right_resize3 = torch.Tensor([self.args.resize_width - self.args.resize_width/8*3 - 1, self.args.resize_width - self.args.resize_width/8*3 - 1])
+            four_point_1[:, 0, 0] = t_tensor + top_left_resize3
+            four_point_1[:, 0, 1] = t_tensor + top_right_resize3
+            four_point_1[:, 1, 0] = t_tensor + bottom_left_resize3
+            four_point_1[:, 1, 1] = t_tensor + bottom_right_resize3
+        elif self.args.database_size == 2560:
+            top_left_resize4 = torch.Tensor([self.args.resize_width/5*2, self.args.resize_width/5*2])
+            top_right_resize4 = torch.Tensor([self.args.resize_width - self.args.resize_width/5*2 - 1, self.args.resize_width/5*2])
+            bottom_left_resize4 = torch.Tensor([self.args.resize_width/5*2, self.args.resize_width - self.args.resize_width/5*2 - 1])
+            bottom_right_resize4 = torch.Tensor([self.args.resize_width - self.args.resize_width/5*2 - 1, self.args.resize_width - self.args.resize_width/5*2 - 1])
+            four_point_1[:, 0, 0] = t_tensor + top_left_resize4
+            four_point_1[:, 0, 1] = t_tensor + top_right_resize4
+            four_point_1[:, 1, 0] = t_tensor + bottom_left_resize4
+            four_point_1[:, 1, 1] = t_tensor + bottom_right_resize4
         else:
             raise NotImplementedError()
         four_point_org = four_point_org.flatten(1).permute(1, 0).unsqueeze(0).contiguous() 
