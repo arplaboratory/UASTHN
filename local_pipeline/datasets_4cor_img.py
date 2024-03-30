@@ -13,9 +13,10 @@ from os.path import join
 import h5py
 from sklearn.neighbors import NearestNeighbors
 import logging
-from PIL import Image
+from PIL import Image, ImageFile
 import torchvision.transforms as transforms
 
+Image.MAX_IMAGE_PIXELS = None
 marginal = 0
 # patch_size = 256
 
@@ -278,13 +279,20 @@ class MYDATA(homo_dataset):
         self.dataset_name = dataset_name
         self.split = split
         # Redirect datafolder path to h5
-        self.database_folder_h5_path = join(
+        # self.database_folder_h5_path = join(
+        #     datasets_folder, dataset_name, split + "_database.h5"
+        # )
+        self.database_folder_nameh5_path = join(
             datasets_folder, dataset_name, split + "_database.h5"
+        )
+        self.database_folder_map_path = join(
+            datasets_folder, "20201117_west_of_rimah", "20201117_west_of_rimah_BingSatellite.tif"
         )
         self.queries_folder_h5_path = join(
             datasets_folder, dataset_name, split + "_queries.h5"
         )
-        database_folder_h5_df = h5py.File(self.database_folder_h5_path, "r", swmr=True)
+        # database_folder_h5_df = h5py.File(self.database_folder_h5_path, "r", swmr=True)
+        database_folder_nameh5_df = h5py.File(self.database_folder_nameh5_path, "r", swmr=True)
         queries_folder_h5_df = h5py.File(self.queries_folder_h5_path, "r", swmr=True)
 
         # Map name to index
@@ -292,7 +300,8 @@ class MYDATA(homo_dataset):
         self.queries_name_dict = {}
 
         # Duplicated elements are added
-        for index, database_image_name in enumerate(database_folder_h5_df["image_name"]):
+        # for index, database_image_name in enumerate(database_folder_h5_df["image_name"]):
+        for index, database_image_name in enumerate(database_folder_nameh5_df["image_name"]):
             database_image_name_decoded = database_image_name.decode("UTF-8")
             while database_image_name_decoded in self.database_name_dict:
                 northing = [str(float(database_image_name_decoded.split("@")[2])+0.00001)]
@@ -354,9 +363,11 @@ class MYDATA(homo_dataset):
         self.queries_num = len(self.queries_paths)
 
         # Close h5 and initialize for h5 reading in __getitem__
-        self.database_folder_h5_df = None
+        # self.database_folder_h5_df = None
+        self.database_folder_nameh5_df = None
         self.queries_folder_h5_df = None
-        database_folder_h5_df.close()
+        # database_folder_h5_df.close()
+        database_folder_nameh5_df.close()
         queries_folder_h5_df.close()
         
         # Some queries might have no positive, we should remove those queries.
@@ -388,9 +399,12 @@ class MYDATA(homo_dataset):
     
     def __getitem__(self, index):
         # Init
-        if self.database_folder_h5_df is None:
-            self.database_folder_h5_df = h5py.File(
-                self.database_folder_h5_path, "r", swmr=True)
+        if self.queries_folder_h5_df is None:
+            # self.database_folder_h5_df = h5py.File(
+            #     self.database_folder_h5_path, "r", swmr=True)
+            self.database_folder_nameh5_df = h5py.File(
+                self.database_folder_nameh5_path, "r", swmr=True)
+            self.database_folder_map_df = Image.open(self.database_folder_map_path)
             self.queries_folder_h5_df = h5py.File(
                 self.queries_folder_h5_path, "r", swmr=True)
             
@@ -409,7 +423,8 @@ class MYDATA(homo_dataset):
         
         # Positives
         pos_index = random.choice(self.get_positive_indexes(index))
-        pos_img = self._find_img_in_h5(pos_index, database_queries_split="database")
+        # pos_img = self._find_img_in_h5(pos_index, database_queries_split="database")
+        pos_img = self._find_img_in_map(pos_index, database_queries_split="database")
         
         query_utm = torch.tensor(self.queries_utms[index]).unsqueeze(0)
         database_utm = torch.tensor(self.database_utms[pos_index]).unsqueeze(0)
@@ -448,6 +463,18 @@ class MYDATA(homo_dataset):
         else:
             raise KeyError("Dont find correct database_queries_split!")
 
+        return img
+    
+    def _find_img_in_map(self, index, database_queries_split=None):
+        if database_queries_split != 'database':
+            raise NotImplementedError()
+        image_name = "_".join(
+            self.database_paths[index].split("_")[1:])
+        img = self.database_folder_map_df
+        center_cood = (float(image_name.split("@")[1]), float(image_name.split("@")[2]))
+        area = (int(center_cood[1]) - self.args.database_size//2, int(center_cood[0]) - self.args.database_size//2,
+                int(center_cood[1]) + self.args.database_size//2, int(center_cood[0]) + self.args.database_size//2)
+        img = img.crop(area)
         return img
 
 def fetch_dataloader(args, split='train'):
