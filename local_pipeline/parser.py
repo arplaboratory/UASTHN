@@ -2,7 +2,7 @@ import argparse
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name', default='STHN', help="name your experiment")
+    parser.add_argument('--name', default='UAGL', help="name your experiment")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--gpuid', type=int, nargs='+', default=[0])
     parser.add_argument('--lev0', default=True, action='store_true', help='warp no')

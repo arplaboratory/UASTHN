@@ -2,7 +2,7 @@ import numpy as np
 import os
 import torch
 import argparse
-from model.network import STHN
+from model.network import UAGL
 from utils import save_overlap_img, save_img, setup_seed, save_overlap_bbox_img
 import datasets_4cor_img as datasets
 import scipy.io as io
@@ -24,7 +24,7 @@ import wandb
 
 def test(args, wandb_log):
     if not args.identity:
-        model = STHN(args)
+        model = UAGL(args)
         if not args.train_ue_method == "train_only_ue_raw_input":
             model_med = torch.load(args.eval_model, map_location='cuda:0')
             for key in list(model_med['netG'].keys()):
@@ -250,5 +250,5 @@ if __name__ == '__main__':
     logging.debug(args)
     wandb_log = True
     if wandb_log:
-        wandb.init(project="STHN-eval", entity="xjh19971", config=vars(args))
+        wandb.init(project="UAGL-eval", entity="xjh19971", config=vars(args))
     test(args, wandb_log)

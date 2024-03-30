@@ -9,7 +9,7 @@ import torchvision
 from torch.cuda.amp import GradScaler
 from tqdm import tqdm
 
-from model.network import STHN
+from model.network import UAGL
 from utils import count_parameters, save_img, save_overlap_img, setup_seed, warp
 import commons
 from os.path import join
@@ -23,7 +23,7 @@ import logging
 from myevaluate import evaluate_SNet
 
 def main(args):
-    model = STHN(args, for_training=True)
+    model = UAGL(args, for_training=True)
     model.setup()
     if args.train_ue_method in ['train_only_ue', 'train_only_ue_raw_input']:
         model.netG.eval()
@@ -173,6 +173,6 @@ if __name__ == "__main__":
     commons.setup_logging(args.save_dir, console='info')
     setup_seed(0)
 
-    wandb.init(project="STHN", entity="xjh19971", config=vars(args))
+    wandb.init(project="UAGL", entity="xjh19971", config=vars(args))
         
     main(args)

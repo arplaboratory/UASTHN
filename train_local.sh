@@ -39,3 +39,17 @@
 
 ## 2 stage permute
 # sbatch scripts/local_larger_permute/train_local_sparse_512_extended_long_load_f_aug64_c.sbatch
+
+# 2048
+sbatch scripts/local_largest_2048/train_local_dense_extended.sbatch
+sbatch scripts/local_largest_2048/train_local_sparse_64_extended.sbatch
+sbatch scripts/local_largest_2048/train_local_sparse_128_extended.sbatch
+sbatch scripts/local_largest_2048/train_local_sparse_256_extended_long.sbatch
+sbatch scripts/local_largest_2048/train_local_sparse_512_extended_long.sbatch
+
+# 2560
+sbatch scripts/local_largest_2560/train_local_dense_extended.sbatch
+sbatch scripts/local_largest_2560/train_local_sparse_64_extended.sbatch
+sbatch scripts/local_largest_2560/train_local_sparse_128_extended.sbatch
+sbatch scripts/local_largest_2560/train_local_sparse_256_extended_long.sbatch
+sbatch scripts/local_largest_2560/train_local_sparse_512_extended_long.sbatch

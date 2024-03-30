@@ -1,6 +1,6 @@
-# STHN: Deep Homography Estimation for UAV Thermal Geo-localization with Satellite Imagery
+# UAGL: Deep Homography Estimation for UAV Thermal Geo-localization with Satellite Imagery
 
-This is the official repository for [STHN: Deep Homography Estimation for UAV Thermal Geo-localization with Satellite Imagery](https://arxiv.org/abs/2306.02994).
+This is the official repository for [UAGL: Deep Homography Estimation for UAV Thermal Geo-localization with Satellite Imagery](https://arxiv.org/abs/2306.02994).
 
 ```
 bibtex TBD
@@ -17,7 +17,7 @@ Dataset link (957 GB): [Download](https://drive.google.com/drive/folders/1HRUlR-
 The ``datasets`` folder should be created in the root folder with the following structure. By default, the dataset uses $W_S=512$, while the ``larger`` suffix indicates $W_S=1536$.
 
 ```
-STHN/datasets/
+UAGL/datasets/
 ├── satellite_0_satellite_0_dense
 │   └── train_database.h5
 ├── satellite_0_satellite_0_dense_larger_ori

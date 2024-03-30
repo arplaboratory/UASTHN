@@ -1,7 +1,7 @@
 #!/bin/bash
 
 eval "$(conda shell.bash hook)"
-conda activate STHN
+conda activate UAGL
 
 # sbatch --export=ALL,DC=50,MODEL=satellite_0_thermalmapping_135_nocontrast_dense_exclusion_larger_ori_train-2024-02-18_20-47-27-873eee1d-0406-4b02-bec3-088c7c03cc59 scripts/local_larger/eval_local_sparse_512_extended.sbatch
 # sbatch --export=ALL,DC=64,MODEL=satellite_0_thermalmapping_135_nocontrast_dense_exclusion_larger_ori_train-2024-02-18_20-50-15-e2aa1243-510e-4d85-b8d8-5fad4cfb46f3 scripts/local_larger/eval_local_sparse_512_extended.sbatch

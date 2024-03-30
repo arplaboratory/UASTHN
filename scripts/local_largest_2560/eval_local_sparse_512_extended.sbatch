@@ -2,13 +2,13 @@
 #SBATCH --nodes=1                        # requests 3 compute servers
 #SBATCH --ntasks-per-node=1              # runs 2 tasks on each server
 #SBATCH --cpus-per-task=8               # uses 1 compute core per task
-#SBATCH --time=24:00:00
+#SBATCH --time=00:20:00
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=100GB
-#SBATCH --job-name=train_local
-#SBATCH --output=train_local.out
+#SBATCH --job-name=eval_local
+#SBATCH --output=eval_local.out
 
 eval "$(conda shell.bash hook)"
 conda activate UAGL
 
-python3 ./local_pipeline/train_4cor.py --dataset_name satellite_0_thermalmapping_135_nocontrast_dense_exclusion --val_positive_dist_threshold 128 
+python3 ./local_pipeline/myevaluate.py --dataset_name satellite_0_thermalmapping_135_largest_ori_train --eval_model logs/local_he/$MODEL/RHWF.pth --val_positive_dist_threshold $DC --lev0 --database_size 2560 --corr_level 4 --test

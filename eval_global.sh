@@ -1,7 +1,7 @@
 #!/bin/bash
 
 eval "$(conda shell.bash hook)"
-conda activate STHN
+conda activate UAGL
 
 # # netvlad DANN
 # python3 global_pipeline/eval.py --resume='logs/global_retrieval/satellite_0_thermalmapping_135_contrast_dense_exclusion-2024-02-19_12-10-07-dd8b1b8b-d529-4277-b96c-2480b813eb69/best_model.pth' --dataset_name=satellite_0_thermalmapping_135 --datasets_folder ./datasets --aggregation netvlad --infer_batch_size 16 --prior_location_threshold=512 --backbone resnet50conv4 --fc_output_dim 4096 --G_contrast manual

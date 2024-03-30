@@ -156,7 +156,7 @@ arch_list = {"IHN": IHN,
              "LocalTrans": LocalTrans,
              }
 
-class STHN():
+class UAGL():
     def __init__(self, args, for_training=False):
         super().__init__()
         self.args = args
