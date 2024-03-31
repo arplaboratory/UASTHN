@@ -15,7 +15,7 @@ from sklearn.neighbors import NearestNeighbors
 import logging
 from PIL import Image, ImageFile
 import torchvision.transforms as transforms
-import torch.nn.functional as F
+import torchvision.transforms.functional as F
 Image.MAX_IMAGE_PIXELS = None
 marginal = 0
 # patch_size = 256
@@ -57,35 +57,12 @@ class homo_dataset(data.Dataset):
             [
                 transforms.Resize([self.args.resize_width, self.args.resize_width]),
                 transforms.ToTensor(),
-                # transforms.Normalize(mean=imagenet_mean, std=imagenet_std), # Move to gpu
-            ]
-        )
-        base_transform_ori = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                # transforms.Normalize(mean=imagenet_mean, std=imagenet_std), # Move to gpu
             ]
         )
         self.query_transform = transforms.Compose(
             [
                 transforms.Grayscale(num_output_channels=3),
                 base_transform
-            ]
-        )
-        self.query_transform_ori = transforms.Compose(
-            [
-                transforms.Grayscale(num_output_channels=3),
-                base_transform_ori
-            ]
-        )
-        self.database_transform = transforms.Compose(
-            [
-                base_transform
-            ]
-        )
-        self.database_transform_ori = transforms.Compose(
-            [
-                base_transform_ori
             ]
         )
         
@@ -146,8 +123,7 @@ class homo_dataset(data.Dataset):
         t[0][0], t[0][1] = t[0][1], t[0][0] # Swap!
         
         # img1, img2, img2_ori = self.query_transform(img1), self.database_transform(img2), self.database_transform_ori(img2)
-        img1, img2_ori = self.query_transform(img1), self.database_transform_ori(img2)
-        img2 = img2_ori
+        img1 = self.query_transform(img1)
         alpha = self.args.database_size / self.args.resize_width
         t = t / alpha # align with the resized image
         
@@ -288,6 +264,7 @@ class MYDATA(homo_dataset):
         self.database_folder_map_path = join(
             datasets_folder, "20201117_west_of_rimah", "20201117_west_of_rimah_BingSatellite.tif"
         )
+        self.database_folder_map_df = F.to_tensor(Image.open(self.database_folder_map_path))
         self.queries_folder_h5_path = join(
             datasets_folder, dataset_name, split + "_queries.h5"
         )
@@ -404,7 +381,6 @@ class MYDATA(homo_dataset):
             #     self.database_folder_h5_path, "r", swmr=True)
             self.database_folder_nameh5_df = h5py.File(
                 self.database_folder_nameh5_path, "r", swmr=True)
-            self.database_folder_map_df = Image.open(self.database_folder_map_path)
             self.queries_folder_h5_df = h5py.File(
                 self.queries_folder_h5_path, "r", swmr=True)
             
@@ -474,14 +450,14 @@ class MYDATA(homo_dataset):
         center_cood = (float(image_name.split("@")[1]), float(image_name.split("@")[2]))
         area = (int(center_cood[1]) - self.args.database_size//2, int(center_cood[0]) - self.args.database_size//2,
                 int(center_cood[1]) + self.args.database_size//2, int(center_cood[0]) + self.args.database_size//2)
-        img = img.crop(area)
+        img = F.crop(img=img, top=area[1], left=area[0], height=area[3]-area[1], width=area[2]-area[0])
         return img
 
 def fetch_dataloader(args, split='train'):
     train_dataset = MYDATA(args, args.datasets_folder, args.dataset_name, split)
     if split == 'train' or split == 'extended':
         train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size,
-                                        pin_memory=False, shuffle=True, num_workers=args.num_workers,
+                                        pin_memory=True, shuffle=True, num_workers=args.num_workers,
                                         drop_last=True, worker_init_fn=seed_worker)
     elif split == 'val' or split == 'test':
         g = torch.Generator()

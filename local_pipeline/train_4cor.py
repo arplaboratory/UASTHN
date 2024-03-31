@@ -92,7 +92,7 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
                              args.save_dir + '/train_overlap_gt.png')
         metrics = model.optimize_parameters()
         if i_batch==0 and args.train_ue_method != 'train_only_ue_raw_input':
-            save_overlap_img(torchvision.utils.make_grid(image1, nrow=16, padding = 16, pad_value=0),
+            save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
                             torchvision.utils.make_grid(model.fake_warped_image_2, nrow=16, padding = 16, pad_value=0),
                             args.save_dir + f'/train_overlap_pred.png')
             if args.two_stages:

@@ -222,7 +222,6 @@ class UAGL():
     def set_input(self, A, B, flow_gt=None, A_ori=None):
         self.image_1_ori = A.to(self.device, non_blocking=True)
         self.image_2 = B.to(self.device, non_blocking=True)
-        self.image_1 = F.interpolate(self.image_1_ori, size=self.args.resize_width, mode='bilinear', align_corners=True, antialias=True)
         self.flow_gt = flow_gt.to(self.device, non_blocking=True)
         if self.flow_gt is not None:
             self.real_warped_image_2 = mywarp(self.image_2, self.flow_gt, self.four_point_org_single)
@@ -233,6 +232,7 @@ class UAGL():
             self.flow_4cor[:, :, 1, 1] = self.flow_gt[:, :, -1, -1]
         else:
             self.real_warped_image_2 = None
+        self.image_1 = F.interpolate(self.image_1_ori, size=self.args.resize_width, mode='bilinear', align_corners=True, antialias=True)
 
     def predict_uncertainty(self, GAN_mode='vanilla', for_training=False):
         if self.args.D_net == "ue_branch":
