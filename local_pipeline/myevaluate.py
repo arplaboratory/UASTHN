@@ -92,12 +92,6 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
             logging.info(f"the first 5th query UTMs: {query_utm[:5]}")
             logging.info(f"the first 5th database UTMs: {database_utm[:5]}")
 
-        if i_batch%1000 == 0:
-            save_img(torchvision.utils.make_grid((img1)),
-                     args.save_dir + "/b1_epoch_" + str(i_batch).zfill(5) + "_finaleval_" + '.png')
-            save_img(torchvision.utils.make_grid((img2)),
-                     args.save_dir + "/b2_epoch_" + str(i_batch).zfill(5) + "_finaleval_" + '.png')
-
         if not args.identity:
             model.set_input(img1, img2, flow_gt)
             flow_4cor = torch.zeros((flow_gt.shape[0], 2, 2, 2))
@@ -164,7 +158,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
                 if not os.path.exists(save_dir):
                     os.mkdir(save_dir)
                 if not args.two_stages:
-                    save_overlap_bbox_img(img1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1)
+                    save_overlap_bbox_img(model.image1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1)
                 else:
                     four_point_org_single_ori = torch.zeros((1, 2, 2, 2))
                     four_point_org_single_ori[:, :, 0, 0] = torch.Tensor([0, 0])
@@ -174,7 +168,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
                     four_point_bbox = model.flow_bbox.cpu().detach() + four_point_org_single_ori
                     alpha = args.database_size / args.resize_width
                     four_point_bbox = four_point_bbox.flatten(2).permute(0, 2, 1).contiguous() / alpha
-                    save_overlap_bbox_img(img1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox)
+                    save_overlap_bbox_img(model.img1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox)
                 
         if not args.identity:
             if args.use_ue:
