@@ -15,7 +15,7 @@ from sklearn.neighbors import NearestNeighbors
 import logging
 from PIL import Image, ImageFile
 import torchvision.transforms as transforms
-
+import torch.nn.functional as F
 Image.MAX_IMAGE_PIXELS = None
 marginal = 0
 # patch_size = 256
@@ -27,9 +27,9 @@ TB_val_region = [2650, 5650, 5100, 9500]
 
 inv_base_transforms = transforms.Compose(
     [ 
-        transforms.Normalize(mean = [ -m/s for m, s in zip(imagenet_mean, imagenet_std)],
-                             std = [ 1/s for s in imagenet_std]),
-        transforms.ToPILImage()
+        # transforms.Normalize(mean = [ -m/s for m, s in zip(imagenet_mean, imagenet_std)],
+        #                      std = [ 1/s for s in imagenet_std]),
+        transforms.ToPILImage(),
     ]
 )
 
@@ -57,13 +57,13 @@ class homo_dataset(data.Dataset):
             [
                 transforms.Resize([self.args.resize_width, self.args.resize_width]),
                 transforms.ToTensor(),
-                transforms.Normalize(mean=imagenet_mean, std=imagenet_std),
+                # transforms.Normalize(mean=imagenet_mean, std=imagenet_std), # Move to gpu
             ]
         )
         base_transform_ori = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Normalize(mean=imagenet_mean, std=imagenet_std),
+                # transforms.Normalize(mean=imagenet_mean, std=imagenet_std), # Move to gpu
             ]
         )
         self.query_transform = transforms.Compose(
@@ -80,13 +80,11 @@ class homo_dataset(data.Dataset):
         )
         self.database_transform = transforms.Compose(
             [
-                transforms.CenterCrop([self.args.database_size, self.args.database_size]),
                 base_transform
             ]
         )
         self.database_transform_ori = transforms.Compose(
             [
-                transforms.CenterCrop([self.args.database_size, self.args.database_size]),
                 base_transform_ori
             ]
         )
@@ -147,7 +145,9 @@ class homo_dataset(data.Dataset):
         t = np.float32(np.array(query_utm - database_utm))
         t[0][0], t[0][1] = t[0][1], t[0][0] # Swap!
         
-        img1, img2, img2_ori = self.query_transform(img1), self.database_transform(img2), self.database_transform_ori(img2)
+        # img1, img2, img2_ori = self.query_transform(img1), self.database_transform(img2), self.database_transform_ori(img2)
+        img1, img2_ori = self.query_transform(img1), self.database_transform_ori(img2)
+        img2 = img2_ori
         alpha = self.args.database_size / self.args.resize_width
         t = t / alpha # align with the resized image
         
@@ -270,7 +270,7 @@ class homo_dataset(data.Dataset):
         pf_patch[:, :, 1] = diff_y_branch1
         flow = torch.from_numpy(pf_patch).permute(2, 0, 1).float()
         H = H.squeeze()
-        return img2, img1, flow, H, query_utm, database_utm, img2_ori
+        return img2, img1, flow, H, query_utm, database_utm
 
 class MYDATA(homo_dataset):
     def __init__(self, args, datasets_folder="datasets", dataset_name="pitts30k", split="train"):
@@ -481,7 +481,7 @@ def fetch_dataloader(args, split='train'):
     train_dataset = MYDATA(args, args.datasets_folder, args.dataset_name, split)
     if split == 'train' or split == 'extended':
         train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size,
-                                        pin_memory=True, shuffle=True, num_workers=args.num_workers,
+                                        pin_memory=False, shuffle=True, num_workers=args.num_workers,
                                         drop_last=True, worker_init_fn=seed_worker)
     elif split == 'val' or split == 'test':
         g = torch.Generator()

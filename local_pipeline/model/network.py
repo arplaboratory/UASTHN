@@ -31,6 +31,8 @@ class IHN(nn.Module):
         if self.args.lev0:
             sz = self.args.resize_width // 4
             self.update_block_4 = GMA(self.args, sz, first_stage)
+        self.imagenet_mean = torch.Tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(self.device)
+        self.imagenet_std = torch.Tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(self.device)
         
     def get_flow_now_4(self, four_point):
         four_point = four_point / 4
@@ -97,8 +99,8 @@ class IHN(nn.Module):
     def forward(self, image1, image2, iters_lev0 = 6, iters_lev1=3, corr_level=2, corr_radius=4):
         # image1 = 2 * (image1 / 255.0) - 1.0
         # image2 = 2 * (image2 / 255.0) - 1.0
-        image1 = image1.contiguous()
-        image2 = image2.contiguous()
+        image1 = (image1 - self.imagenet_mean) / self.imagenet_std
+        image2 = (image2 - self.imagenet_mean) / self.imagenet_std
 
         # time1 = time.time()
         with autocast(enabled=self.args.mixed_precision):
@@ -218,9 +220,9 @@ class UAGL():
         return model
     
     def set_input(self, A, B, flow_gt=None, A_ori=None):
-        self.image_1 = A.to(self.device, non_blocking=True)
+        self.image_1_ori = A.to(self.device, non_blocking=True)
         self.image_2 = B.to(self.device, non_blocking=True)
-        self.image_1_ori = A_ori.to(self.device, non_blocking=True)
+        self.image_1 = F.interpolate(self.image_1_ori, size=self.args.resize_width, mode='bilinear', align_corners=True, antialias=True)
         self.flow_gt = flow_gt.to(self.device, non_blocking=True)
         if self.flow_gt is not None:
             self.real_warped_image_2 = mywarp(self.image_2, self.flow_gt, self.four_point_org_single)
