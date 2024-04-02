@@ -4,11 +4,11 @@
 #SBATCH --cpus-per-task=8               # uses 1 compute core per task
 #SBATCH --time=00:20:00
 #SBATCH --gres=gpu:a100:1
-#SBATCH --mem=100GB
+#SBATCH --mem=200GB
 #SBATCH --job-name=eval_local
 #SBATCH --output=eval_local.out
 
 eval "$(conda shell.bash hook)"
 conda activate UAGL
 
-python3 ./local_pipeline/myevaluate.py --dataset_name satellite_0_thermalmapping_135_largest_ori_train --eval_model logs/local_he/$MODEL/RHWF.pth --val_positive_dist_threshold $DC --lev0 --database_size 2048 --corr_level 4 --test
+python3 ./local_pipeline/myevaluate.py --dataset_name satellite_0_thermalmapping_135_largest_ori_train --eval_model logs/local_he/$MODEL/UAGL.pth --val_positive_dist_threshold $DC --lev0 --database_size 2048 --corr_level 4 --test
