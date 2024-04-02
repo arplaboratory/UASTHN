@@ -281,13 +281,16 @@ class UAGL():
                 # self.four_pred_fine = torch.zeros_like(self.four_pred).to(self.four_pred.device) # DEBUG
                 # self.four_preds_list_fine[-1] = self.four_pred_fine # DEBUG
                 if self.args.second_stage_ue:
-                    B, C1, C2 = self.four_preds_list[-1].shape
+                    B, C1, C2, C3 = self.four_preds_list[-1].shape
                     for i in range(len(self.four_preds_list)):
-                        self.four_preds_list[i] = self.four_preds_list[i].unsqueeze(1).repeat(1, 5, 1, 1).view(B*5, C1, C2)
-                    self.four_pred = self.four_pred.unsqueeze(1).repeat(1, 5, 1, 1).view(B*5, C1, C2)
+                        self.four_preds_list[i] = self.four_preds_list[i].unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C1, C2, C3)
+                    self.four_pred = self.four_pred.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C1, C2, C3)
                     self.four_preds_list, self.four_pred = self.combine_coarse_fine_second_stage_ue(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox, for_training)
                 else:
                     self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox)
+            if self.args.second_stage_ue:
+                B, C, H, W = self.image_2.shape
+                self.image_2 = self.image_2.view(B//5, 5, C, H, W)[:, 0]
             self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
         elif self.args.GAN_mode == "vanilla_rej":
             pass
@@ -348,7 +351,9 @@ class UAGL():
             y_start += y_shift
             x_start = x_start.view(-1)
             y_start = y_start.view(-1)
-            image_1_ori = image_1_ori.repeat(image_1_ori.shape[0]*5, 1, 1, 1)
+            image_1_ori = image_1_ori.repeat(5, 1, 1, 1)
+            w_padded = w_padded.unsqueeze(1).repeat(1, 5).view(-1)
+            
         bbox_s = bbox.bbox_generator(x_start, y_start, w_padded, w_padded)
         delta = (w_padded / self.args.resize_width).unsqueeze(1).unsqueeze(1).unsqueeze(1)
         image_1_crop = tgm.crop_and_resize(image_1_ori, bbox_s, (self.args.resize_width, self.args.resize_width)) # It will be padded when it is out of boundary
@@ -376,37 +381,36 @@ class UAGL():
         four_preds_list_fine = [four_preds_list_fine_single * kappa + flow_bbox / alpha for four_preds_list_fine_single in four_preds_list_fine]
         four_pred_fine = four_pred_fine * kappa + flow_bbox / alpha
         four_preds_list = four_preds_list + four_preds_list_fine
-        four_pred_fine = four_pred_fine.view(four_pred_fine.shape[0]//5, 5, 4, 2)
+        four_pred_fine = four_pred_fine.view(four_pred_fine.shape[0]//5, 5, 2, 2, 2)
         std_four_pred_fine = torch.std(four_pred_fine, dim=1)
         if self.args.ue_agg == "mean":
             mean_four_pred_fine = torch.mean(four_pred_fine, dim=1)
         resized_rej_std = self.args.ue_rej_std / alpha
         resize_maj_vote_rej = self.args.ue_maj_vote_rej / alpha
         for i in range(len(four_pred_fine)):
-            if std_four_pred_fine[i] <= resized_rej_std:
+            if (std_four_pred_fine[i] <= resized_rej_std).all():
                 if self.args.ue_agg == "mean":
-                    four_pred_fine[i] = mean_four_pred_fine[i]
-                elif self.args.ue_agg == "zero":
-                    four_pred_fine[i] = four_pred_fine[i, 0, :, :]
+                    four_pred_fine[i, 0] = mean_four_pred_fine[i]
                 elif self.args.ue_agg == "maj_vote":
-                    four_pred_sum = four_pred_fine[i, 0, :, :].clone()
+                    four_pred_sum = four_pred_fine[i, 0].clone()
                     count = 1
                     for j in range(1,5):
                         if torch.norm(four_pred_fine[i, 0] - four_pred_fine[i, j]) <= resize_maj_vote_rej:
                             four_pred_sum+=four_pred_fine[i, j]
                             count+=1
                     four_pred_sum/=count
-                    four_pred_fine[i] = four_pred_sum
+                    four_pred_fine[i, 0] = four_pred_sum
             else:
-                four_pred_fine[i] = torch.ones_like(four_pred_fine[i]) * -1
+                four_pred_fine[i, 0] = torch.ones_like(four_pred_fine[i, 0]) * -1
+        four_pred_fine = four_pred_fine[:, 0]
         if for_training:
             for i in range(len(four_preds_list)):
-                four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//5, 5, 4, 2)
+                four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//5, 5, 2, 2, 2)
                 if self.args.ue_agg == "mean":
                     mean_four_pred_single = torch.mean(four_pred_single, dim=1)
                     four_preds_list[i] = mean_four_pred_single
                 elif self.args.ue_agg == "zero":
-                    four_preds_list[i] = four_pred_single[:, 0, :, :]
+                    four_preds_list[i] = four_pred_single[:, 0]
         return four_preds_list, four_pred_fine
 
     # def backward_D(self):
