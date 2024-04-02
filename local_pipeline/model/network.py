@@ -251,7 +251,7 @@ class UAGL():
                 raise NotImplementedError()
         return fake_AB_conf
         
-    def forward(self, use_raw_input=False, noise_std=0, sample_method="target_raw"):
+    def forward(self, use_raw_input=False, noise_std=0, sample_method="target_raw", for_training=False):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         if not use_raw_input:
             # time1 = time.time()
@@ -259,6 +259,8 @@ class UAGL():
                 self.four_preds_list, self.four_pred, self.four_ue = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
             else:
                 self.four_preds_list, self.four_pred = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
+            if self.args.first_stage_ue:
+                raise NotImplementedError()
             # time2 = time.time()
             # logging.debug("Time for 1st forward pass: " + str(time2 - time1) + " seconds")
             if self.args.two_stages:
@@ -283,7 +285,7 @@ class UAGL():
                     for i in range(len(self.four_preds_list)):
                         self.four_preds_list[i] = self.four_preds_list[i].unsqueeze(1).repeat(1, 5, 1, 1).view(B*5, C1, C2)
                     self.four_pred = self.four_pred.unsqueeze(1).repeat(1, 5, 1, 1).view(B*5, C1, C2)
-                    self.four_preds_list, self.four_pred = self.combine_coarse_fine_second_stage_ue(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox)
+                    self.four_preds_list, self.four_pred = self.combine_coarse_fine_second_stage_ue(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox, for_training)
                 else:
                     self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox)
             self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
@@ -368,7 +370,7 @@ class UAGL():
         four_preds_list = four_preds_list + four_preds_list_fine
         return four_preds_list, four_pred_fine
 
-    def combine_coarse_fine_second_stage_ue(self, four_preds_list, four_pred, four_preds_list_fine, four_pred_fine, delta, flow_bbox):
+    def combine_coarse_fine_second_stage_ue(self, four_preds_list, four_pred, four_preds_list_fine, four_pred_fine, delta, flow_bbox, for_training):
         alpha = self.args.database_size / self.args.resize_width
         kappa = delta / alpha
         four_preds_list_fine = [four_preds_list_fine_single * kappa + flow_bbox / alpha for four_preds_list_fine_single in four_preds_list_fine]
@@ -376,16 +378,17 @@ class UAGL():
         four_preds_list = four_preds_list + four_preds_list_fine
         four_pred_fine = four_pred_fine.view(four_pred_fine.shape[0]//5, 5, 4, 2)
         std_four_pred_fine = torch.std(four_pred_fine, dim=1)
-        mean_four_pred_fine = torch.mean(four_pred_fine, dim=1)
-        resized_rej_std = self.args.second_stage_ue_rej_std / alpha
-        resize_maj_vote_rej = self.args.second_stage_ue_maj_vote_rej / alpha
+        if self.args.ue_agg == "mean":
+            mean_four_pred_fine = torch.mean(four_pred_fine, dim=1)
+        resized_rej_std = self.args.ue_rej_std / alpha
+        resize_maj_vote_rej = self.args.ue_maj_vote_rej / alpha
         for i in range(len(four_pred_fine)):
             if std_four_pred_fine[i] <= resized_rej_std:
-                if self.args.second_stage_ue_agg == "mean":
+                if self.args.ue_agg == "mean":
                     four_pred_fine[i] = mean_four_pred_fine[i]
-                elif self.args.second_stage_ue_agg == "zero":
+                elif self.args.ue_agg == "zero":
                     four_pred_fine[i] = four_pred_fine[i, 0, :, :]
-                elif self.args.second_stage_ue_agg == "maj_vote":
+                elif self.args.ue_agg == "maj_vote":
                     four_pred_sum = four_pred_fine[i, 0, :, :].clone()
                     count = 1
                     for j in range(1,5):
@@ -396,6 +399,14 @@ class UAGL():
                     four_pred_fine[i] = four_pred_sum
             else:
                 four_pred_fine[i] = torch.ones_like(four_pred_fine[i]) * -1
+        if for_training:
+            for i in range(len(four_preds_list)):
+                four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//5, 5, 4, 2)
+                if self.args.ue_agg == "mean":
+                    mean_four_pred_single = torch.mean(four_pred_single, dim=1)
+                    four_preds_list[i] = mean_four_pred_single
+                elif self.args.ue_agg == "zero":
+                    four_preds_list[i] = four_pred_single[:, 0, :, :]
         return four_preds_list, four_pred_fine
 
     # def backward_D(self):
@@ -503,7 +514,7 @@ class UAGL():
                     param.requires_grad = requires_grad
 
     def optimize_parameters(self):
-        self.forward(use_raw_input = (self.args.train_ue_method == 'train_only_ue_raw_input'), noise_std=self.args.noise_std, sample_method=self.args.sample_method) # Calculate Fake A
+        self.forward(use_raw_input = (self.args.train_ue_method == 'train_only_ue_raw_input'), noise_std=self.args.noise_std, sample_method=self.args.sample_method, for_training=True) # Calculate Fake A
         self.metrics = dict()
         # update D
         if self.args.use_ue and self.args.D_net != "ue_branch":
