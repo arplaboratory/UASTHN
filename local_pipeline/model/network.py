@@ -270,12 +270,22 @@ class UAGL():
                 # time2 = time.time()
                 # logging.debug("Time for crop: " + str(time2 - time1) + " seconds")
                 # time1 = time.time()
+                if self.args.second_stage_ue:
+                    B, C, H, W = self.image_2.shape
+                    self.image_2 = self.image_2.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
                 self.four_preds_list_fine, self.four_pred_fine = self.netG_fine(image1=self.image_1_crop, image2=self.image_2, iters_lev0=self.args.iters_lev1)
                 # time2 = time.time()
                 # logging.debug("Time for 2nd forward pass: " + str(time2 - time1) + " seconds")
                 # self.four_pred_fine = torch.zeros_like(self.four_pred).to(self.four_pred.device) # DEBUG
                 # self.four_preds_list_fine[-1] = self.four_pred_fine # DEBUG
-                self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox)
+                if self.args.second_stage_ue:
+                    B, C1, C2 = self.four_preds_list[-1].shape
+                    for i in range(len(self.four_preds_list)):
+                        self.four_preds_list[i] = self.four_preds_list[i].unsqueeze(1).repeat(1, 5, 1, 1).view(B*5, C1, C2)
+                    self.four_pred = self.four_pred.unsqueeze(1).repeat(1, 5, 1, 1).view(B*5, C1, C2)
+                    self.four_preds_list, self.four_pred = self.combine_coarse_fine_second_stage_ue(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox)
+                else:
+                    self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox)
             self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
         elif self.args.GAN_mode == "vanilla_rej":
             pass
@@ -327,7 +337,16 @@ class UAGL():
         crop_top_left = c + torch.stack([-w_padded / 2, -w_padded / 2], dim=1) # B, 2 = x, y
         x_start = crop_top_left[:, 0] # B
         y_start = crop_top_left[:, 1] # B
-        # Do not use bbox_generator because it will repeat to reduce 1 for end index
+        if self.args.second_stage_ue:
+            x_shift = torch.tensor([0, self.args.ue_shift, self.args.ue_shift, -self.args.ue_shift, -self.args.ue_shift]).unsqueeze(0).to(x_start.device)
+            y_shift = torch.tensor([0, self.args.ue_shift, -self.args.ue_shift, -self.args.ue_shift, self.args.ue_shift]).unsqueeze(0).to(y_start.device)
+            x_start = x_start.unsqueeze(1).repeat(1, 5)
+            y_start = y_start.unsqueeze(1).repeat(1, 5)
+            x_start += x_shift
+            y_start += y_shift
+            x_start = x_start.view(-1)
+            y_start = y_start.view(-1)
+            image_1_ori = image_1_ori.repeat(image_1_ori.shape[0]*5, 1, 1, 1)
         bbox_s = bbox.bbox_generator(x_start, y_start, w_padded, w_padded)
         delta = (w_padded / self.args.resize_width).unsqueeze(1).unsqueeze(1).unsqueeze(1)
         image_1_crop = tgm.crop_and_resize(image_1_ori, bbox_s, (self.args.resize_width, self.args.resize_width)) # It will be padded when it is out of boundary
@@ -347,6 +366,34 @@ class UAGL():
         four_preds_list_fine = [four_preds_list_fine_single * kappa + flow_bbox / alpha for four_preds_list_fine_single in four_preds_list_fine]
         four_pred_fine = four_pred_fine * kappa + flow_bbox / alpha
         four_preds_list = four_preds_list + four_preds_list_fine
+        return four_preds_list, four_pred_fine
+
+    def combine_coarse_fine_second_stage_ue(self, four_preds_list, four_pred, four_preds_list_fine, four_pred_fine, delta, flow_bbox):
+        alpha = self.args.database_size / self.args.resize_width
+        kappa = delta / alpha
+        four_preds_list_fine = [four_preds_list_fine_single * kappa + flow_bbox / alpha for four_preds_list_fine_single in four_preds_list_fine]
+        four_pred_fine = four_pred_fine * kappa + flow_bbox / alpha
+        four_preds_list = four_preds_list + four_preds_list_fine
+        four_pred_fine = four_pred_fine.view(four_pred_fine.shape[0]//5, 5, 4, 2)
+        std_four_pred_fine = torch.std(four_pred_fine, dim=1)
+        mean_four_pred_fine = torch.mean(four_pred_fine, dim=1)
+        for i in range(len(four_pred_fine)):
+            if std_four_pred_fine[i] <= self.args.second_stage_ue_rej_std:
+                if self.args.second_stage_ue_agg == "mean":
+                    four_pred_fine[i] = mean_four_pred_fine[i]
+                elif self.args.second_stage_ue_agg == "zero":
+                    four_pred_fine[i] = four_pred_fine[i, 0, :, :]
+                elif self.args.second_stage_ue_agg == "maj_vote":
+                    four_pred_sum = four_pred_fine[i, 0, :, :].clone()
+                    count = 1
+                    for j in range(1,5):
+                        if torch.norm(four_pred_fine[i, 0] - four_pred_fine[i, j]) <= self.args.second_stage_ue_maj_vote_rej:
+                            four_pred_sum+=four_pred_fine[i, j]
+                            count+=1
+                    four_pred_sum/=count
+                    four_pred_fine[i] = four_pred_sum
+            else:
+                four_pred_fine[i] = torch.ones_like(four_pred_fine[i]) * -1
         return four_preds_list, four_pred_fine
 
     # def backward_D(self):
