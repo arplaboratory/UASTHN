@@ -60,8 +60,8 @@ def parse_arguments():
     parser.add_argument('--second_stage_ue', action="store_true")
     parser.add_argument('--ue_shift', type=int, default=64)
     parser.add_argument('--second_stage_ue_agg', type=str, choices=["mean", "zero", "maj_vote"], default="zero")
-    parser.add_argument('--second_stage_ue_rej_std', type=float, default=2.0)
-    parser.add_argument('--second_stage_ue_maj_vote_rej', type=float, default=2.0)
+    parser.add_argument('--second_stage_ue_rej_std', type=float, default=30.0)
+    parser.add_argument('--second_stage_ue_maj_vote_rej', type=float, default=30.0)
     args = parser.parse_args()
     args.save_dir = "local_he"
     args.augment_type = "center"

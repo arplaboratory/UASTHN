@@ -377,8 +377,10 @@ class UAGL():
         four_pred_fine = four_pred_fine.view(four_pred_fine.shape[0]//5, 5, 4, 2)
         std_four_pred_fine = torch.std(four_pred_fine, dim=1)
         mean_four_pred_fine = torch.mean(four_pred_fine, dim=1)
+        resized_rej_std = self.args.second_stage_ue_rej_std / alpha
+        resize_maj_vote_rej = self.args.second_stage_ue_maj_vote_rej / alpha
         for i in range(len(four_pred_fine)):
-            if std_four_pred_fine[i] <= self.args.second_stage_ue_rej_std:
+            if std_four_pred_fine[i] <= resized_rej_std:
                 if self.args.second_stage_ue_agg == "mean":
                     four_pred_fine[i] = mean_four_pred_fine[i]
                 elif self.args.second_stage_ue_agg == "zero":
@@ -387,7 +389,7 @@ class UAGL():
                     four_pred_sum = four_pred_fine[i, 0, :, :].clone()
                     count = 1
                     for j in range(1,5):
-                        if torch.norm(four_pred_fine[i, 0] - four_pred_fine[i, j]) <= self.args.second_stage_ue_maj_vote_rej:
+                        if torch.norm(four_pred_fine[i, 0] - four_pred_fine[i, j]) <= resize_maj_vote_rej:
                             four_pred_sum+=four_pred_fine[i, j]
                             count+=1
                     four_pred_sum/=count
