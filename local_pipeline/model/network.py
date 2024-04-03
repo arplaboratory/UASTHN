@@ -354,7 +354,8 @@ class UAGL():
             y_start += y_shift
             x_start = x_start.view(-1)
             y_start = y_start.view(-1)
-            image_1_ori = image_1_ori.repeat(5, 1, 1, 1)
+            B, C, H, W = image_1_ori.shape
+            image_1_ori = image_1_ori.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
             w_padded = w_padded.unsqueeze(1).repeat(1, 5).view(-1)
             
         bbox_s = bbox.bbox_generator(x_start, y_start, w_padded, w_padded)
