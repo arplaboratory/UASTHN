@@ -11,4 +11,4 @@
 eval "$(conda shell.bash hook)"
 conda activate UAGL
 
-python3 ./local_pipeline/train_4cor.py --dataset_name satellite_0_thermalmapping_135_nocontrast_dense_exclusion_larger_ori_train --val_positive_dist_threshold 64 --database_size 2560 --two_stages --corr_level 4 --restore_ckpt logs/local_he/satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-03-31_20-30-30-d18750d3-5782-46d7-8993-54c3779f60d2/UAGL.pth --finetune --detach --augment_two_stages 64
+python3 ./local_pipeline/train_4cor.py --dataset_name satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train --val_positive_dist_threshold 64 --database_size 2560 --two_stages --corr_level 4 --restore_ckpt logs/local_he/satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-03-31_20-30-30-d18750d3-5782-46d7-8993-54c3779f60d2/UAGL.pth --finetune --detach --augment_two_stages 64
