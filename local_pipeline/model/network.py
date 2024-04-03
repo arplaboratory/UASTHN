@@ -31,9 +31,9 @@ class IHN(nn.Module):
         if self.args.lev0:
             sz = self.args.resize_width // 4
             self.update_block_4 = GMA(self.args, sz, first_stage)
-        self.imagenet_mean = torch.Tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(self.device)
-        self.imagenet_std = torch.Tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(self.device)
-        
+        self.imagenet_mean = None
+        self.imagenet_std = None
+
     def get_flow_now_4(self, four_point):
         four_point = four_point / 4
         four_point_org = torch.zeros((2, 2, 2)).to(four_point.device)
@@ -99,6 +99,9 @@ class IHN(nn.Module):
     def forward(self, image1, image2, iters_lev0 = 6, iters_lev1=3, corr_level=2, corr_radius=4):
         # image1 = 2 * (image1 / 255.0) - 1.0
         # image2 = 2 * (image2 / 255.0) - 1.0
+        if self.imagenet_mean is None:
+            self.imagenet_mean = torch.Tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(image1.device)
+            self.imagenet_std = torch.Tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(image1.device)
         image1 = (image1 - self.imagenet_mean) / self.imagenet_std
         image2 = (image2 - self.imagenet_mean) / self.imagenet_std
 
