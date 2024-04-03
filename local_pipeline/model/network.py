@@ -277,8 +277,10 @@ class UAGL():
                 # time1 = time.time()
                 if self.args.second_stage_ue:
                     B, C, H, W = self.image_2.shape
-                    self.image_2 = self.image_2.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
-                self.four_preds_list_fine, self.four_pred_fine = self.netG_fine(image1=self.image_1_crop, image2=self.image_2, iters_lev0=self.args.iters_lev1)
+                    self.image_2_crop = self.image_2.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
+                else:
+                    self.image_2_crop = self.image_2
+                self.four_preds_list_fine, self.four_pred_fine = self.netG_fine(image1=self.image_1_crop, image2=self.image_2_crop, iters_lev0=self.args.iters_lev1)
                 # time2 = time.time()
                 # logging.debug("Time for 2nd forward pass: " + str(time2 - time1) + " seconds")
                 # self.four_pred_fine = torch.zeros_like(self.four_pred).to(self.four_pred.device) # DEBUG
@@ -291,9 +293,6 @@ class UAGL():
                     self.four_preds_list, self.four_pred = self.combine_coarse_fine_second_stage_ue(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox, for_training)
                 else:
                     self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox)
-            if self.args.second_stage_ue:
-                B, C, H, W = self.image_2.shape
-                self.image_2 = self.image_2.view(B//5, 5, C, H, W)[:, 0]
             self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
         elif self.args.GAN_mode == "vanilla_rej":
             pass
@@ -392,9 +391,11 @@ class UAGL():
         resized_rej_std = self.args.ue_rej_std / alpha
         resize_maj_vote_rej = self.args.ue_maj_vote_rej / alpha
         for i in range(len(four_pred_fine)):
-            if (std_four_pred_fine[i] <= resized_rej_std).all():
+            if (std_four_pred_fine[i] <= resized_rej_std).all() or for_training:
                 if self.args.ue_agg == "mean":
                     four_pred_fine[i, 0] = mean_four_pred_fine[i]
+                elif self.args.ue_agg == "zero":
+                    pass
                 elif self.args.ue_agg == "maj_vote":
                     four_pred_sum = four_pred_fine[i, 0].clone()
                     count = 1
@@ -405,7 +406,7 @@ class UAGL():
                     four_pred_sum/=count
                     four_pred_fine[i, 0] = four_pred_sum
             else:
-                four_pred_fine[i, 0] = torch.ones_like(four_pred_fine[i, 0]) * -1
+                four_pred_fine[i, 0] = torch.ones_like(four_pred_fine[i, 0]) * float('nan')
         four_pred_fine = four_pred_fine[:, 0]
         if for_training:
             for i in range(len(four_preds_list)):
@@ -555,23 +556,27 @@ def mywarp(x, flow_pred, four_point_org_single):
     x: [B, C, H, W] (im2)
     flo: [B, 2, H, W] flow
     """
-    if flow_pred.shape[-1] != 2:
-        flow_4cor = torch.zeros((flow_pred.shape[0], 2, 2, 2)).to(flow_pred.device)
-        flow_4cor[:, :, 0, 0] = flow_pred[:, :, 0, 0]
-        flow_4cor[:, :, 0, 1] = flow_pred[:, :, 0, -1]
-        flow_4cor[:, :, 1, 0] = flow_pred[:, :, -1, 0]
-        flow_4cor[:, :, 1, 1] = flow_pred[:, :, -1, -1]
-    else:
-        flow_4cor = flow_pred
+    if not torch.isnan(flow_pred).any():
+        if flow_pred.shape[-1] != 2:
+            flow_4cor = torch.zeros((flow_pred.shape[0], 2, 2, 2)).to(flow_pred.device)
+            flow_4cor[:, :, 0, 0] = flow_pred[:, :, 0, 0]
+            flow_4cor[:, :, 0, 1] = flow_pred[:, :, 0, -1]
+            flow_4cor[:, :, 1, 0] = flow_pred[:, :, -1, 0]
+            flow_4cor[:, :, 1, 1] = flow_pred[:, :, -1, -1]
+        else:
+            flow_4cor = flow_pred
 
-    four_point_1 = flow_4cor + four_point_org_single
-    
-    four_point_org = four_point_org_single.repeat(flow_pred.shape[0],1,1,1).flatten(2).permute(0, 2, 1).contiguous() 
-    four_point_1 = four_point_1.flatten(2).permute(0, 2, 1).contiguous() 
-    try:
-        H = tgm.get_perspective_transform(four_point_org, four_point_1)
-    except Exception:
-        logging.debug("No solution")
-        H = torch.eye(3).to(four_point_org.device).repeat(four_point_1.shape[0],1,1)
-    warped_image = tgm.warp_perspective(x, H, (x.shape[2], x.shape[3]))
+        four_point_1 = flow_4cor + four_point_org_single
+        
+        four_point_org = four_point_org_single.repeat(flow_pred.shape[0],1,1,1).flatten(2).permute(0, 2, 1).contiguous() 
+        four_point_1 = four_point_1.flatten(2).permute(0, 2, 1).contiguous() 
+        try:
+            H = tgm.get_perspective_transform(four_point_org, four_point_1)
+        except Exception:
+            logging.debug("No solution")
+            H = torch.eye(3).to(four_point_org.device).repeat(four_point_1.shape[0],1,1)
+        warped_image = tgm.warp_perspective(x, H, (x.shape[2], x.shape[3]))
+    else:
+        logging.debug("Output NaN by uncertainty rejection or model error.")
+        warped_image = x
     return warped_image

@@ -97,6 +97,7 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
                             args.save_dir + f'/train_overlap_pred.png')
             if args.two_stages:
                 save_img(torchvision.utils.make_grid(model.image_1_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_crop.png')
+                save_img(torchvision.utils.make_grid(model.image_2_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_crop.png')
         model.update_learning_rate()
         if args.train_ue_method != 'train_only_ue_raw_input':
             metrics["lr"] = model.scheduler_G.get_lr()
