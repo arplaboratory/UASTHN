@@ -84,13 +84,13 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
         tic = time.time()
         image1, image2, flow, _, query_utm, database_utm  = [x for x in data_blob]
         model.set_input(image1, image2, flow)
+        metrics = model.optimize_parameters()
         if i_batch==0:
             save_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1.png')
             save_img(torchvision.utils.make_grid(model.image_2, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2.png')
             save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
                              torchvision.utils.make_grid(model.real_warped_image_2, nrow=16, padding = 16, pad_value=0), 
                              args.save_dir + '/train_overlap_gt.png')
-        metrics = model.optimize_parameters()
         if i_batch==0 and args.train_ue_method != 'train_only_ue_raw_input':
             save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
                             torchvision.utils.make_grid(model.fake_warped_image_2, nrow=16, padding = 16, pad_value=0),
