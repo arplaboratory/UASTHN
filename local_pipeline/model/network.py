@@ -401,7 +401,7 @@ class UAGL():
         return x_start, y_start, image_1_ori, w_padded
 
     def second_stage_ue_aggregation(self, four_preds_list, four_pred_fine, alpha, for_training):
-        four_preds_list, four_pred_fine = self.ue_aggregation(self, four_preds_list, four_pred_fine, alpha, for_training)
+        four_preds_list, four_pred_fine = self.ue_aggregation(four_preds_list, four_pred_fine, alpha, for_training)
         return four_preds_list, four_pred_fine
 
     def first_stage_ue_generate_bbox(self):
@@ -419,39 +419,41 @@ class UAGL():
         return bbox_s
 
     def ue_aggregation(self, four_preds_list, four_pred, alpha, for_training):
-        four_pred = four_pred.view(four_pred.shape[0]//5, 5, 2, 2, 2)
-        std_four_pred = torch.std(four_pred, dim=1)
-        if self.args.ue_agg == "mean":
-            mean_four_pred = torch.mean(four_pred, dim=1)
-        resized_rej_std = self.args.ue_rej_std / alpha
-        resize_maj_vote_rej = self.args.ue_maj_vote_rej / alpha
-        for i in range(len(four_pred)):
-            if (std_four_pred[i] <= resized_rej_std).all() or for_training:
-                if self.args.ue_agg == "mean":
-                    four_pred[i, 0] = mean_four_pred[i]
-                elif self.args.ue_agg == "zero":
-                    pass
-                elif self.args.ue_agg == "maj_vote":
-                    four_pred_sum = four_pred[i, 0].clone()
-                    count = 1
-                    for j in range(1,5):
-                        if torch.norm(four_pred[i, 0] - four_pred[i, j]) <= resize_maj_vote_rej:
-                            four_pred_sum+=four_pred[i, j]
-                            count+=1
-                    four_pred_sum/=count
-                    four_pred[i, 0] = four_pred_sum
-            else:
-                four_pred[i, 0] = torch.ones_like(four_pred[i, 0]) * float('nan')
-        four_pred = four_pred[:, 0]
+        # four_pred = four_pred.view(four_pred.shape[0]//5, 5, 2, 2, 2)
+        # std_four_pred = torch.std(four_pred, dim=1)
+        # if self.args.ue_agg == "mean":
+        #     mean_four_pred = torch.mean(four_pred, dim=1)
+        # resized_rej_std = self.args.ue_rej_std / alpha
+        # resize_maj_vote_rej = self.args.ue_maj_vote_rej / alpha
+        # for i in range(len(four_pred)):
+        #     if (std_four_pred[i] <= resized_rej_std).all() or for_training:
+        #         if self.args.ue_agg == "mean":
+        #             four_pred[i, 0] = mean_four_pred[i]
+        #         elif self.args.ue_agg == "zero":
+        #             pass
+        #         elif self.args.ue_agg == "maj_vote":
+        #             four_pred_sum = four_pred[i, 0].clone()
+        #             count = 1
+        #             for j in range(1,5):
+        #                 if torch.norm(four_pred[i, 0] - four_pred[i, j]) <= resize_maj_vote_rej:
+        #                     four_pred_sum+=four_pred[i, j]
+        #                     count+=1
+        #             four_pred_sum/=count
+        #             four_pred[i, 0] = four_pred_sum
+        #     else:
+        #         four_pred[i, 0] = torch.ones_like(four_pred[i, 0]) * float('nan')
+        # four_pred_new = four_pred[:, 0]
+        four_preds_list_new = []
         if for_training:
             for i in range(len(four_preds_list)):
                 four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//5, 5, 2, 2, 2)
                 if self.args.ue_agg == "mean":
                     mean_four_pred_single = torch.mean(four_pred_single, dim=1)
-                    four_preds_list[i] = mean_four_pred_single
+                    four_preds_list_new.append(mean_four_pred_single)
                 elif self.args.ue_agg == "zero":
-                    four_preds_list[i] = four_pred_single[:, 0]
-        return four_preds_list, four_pred
+                    four_preds_list_new.append(four_pred_single[:, 0])
+        four_pred_new = four_preds_list_new[-1]
+        return four_preds_list_new, four_pred_new
 
     # def backward_D(self):
     #     """Calculate GAN loss for the discriminator"""
@@ -461,7 +463,7 @@ class UAGL():
     #     else:
     #         fake_AB = torch.cat((self.image_1, self.image_2), 1)  # we use conditional GANs; we need to feed both input and output to the discriminator
     #     pred_fake = self.netD(fake_AB.detach())
-    #     if self.args.GAN_mode in ['vanilla', 'lsgan']:
+    #     if self.args.GAN_mode in ['vanilla', 'lsgan']:g
     #         self.loss_D_fake = self.criterionGAN(pred_fake, False)
     #     elif self.args.GAN_mode == 'macegan':
     #         mace_ = (self.flow_4cor - self.four_pred)**2
