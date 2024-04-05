@@ -368,18 +368,19 @@ class UAGL():
         four_pred_fine = four_pred_fine * kappa + flow_bbox / alpha
         four_preds_list = four_preds_list + four_preds_list_fine
         if self.args.second_stage_ue:
-            four_preds_list, four_pred_fine = self.second_stage_ue_aggregation(four_preds_list, four_pred_fine, for_training)
+            four_preds_list, four_pred_fine = self.second_stage_ue_aggregation(four_preds_list, four_pred_fine, alpha, for_training)
         return four_preds_list, four_pred_fine
 
     def first_stage_ue_generate(self):
+        B, C, H, W = self.image_2.shape
         self.image_1 = self.image_1.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
         self.image_2 = self.image_2.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
         bbox_s = self.first_stage_ue_generate_bbox()
         self.image_2 = tgm.crop_and_resize(self.image_2, bbox_s, (self.args.resize_width, self.args.resize_width))
 
     def first_stage_ue_aggregation(self, four_preds_list, four_pred, for_training):
-        four_preds_list, four_pred = self.calibrate_shift(four_preds_list, four_pred)
-        four_preds_list, four_pred = self.ue_aggregation(four_preds_list, four_pred, for_training)
+        alpha = self.args.database_size / self.args.resize_width
+        four_preds_list, four_pred = self.ue_aggregation(four_preds_list, four_pred, alpha, for_training)
         return four_preds_list, four_pred
 
     def second_stage_ue_generate(self, x_start, y_start, image_1_ori, w_padded):
@@ -396,8 +397,8 @@ class UAGL():
         w_padded = w_padded.unsqueeze(1).repeat(1, 5).view(-1)
         return x_start, y_start, image_1_ori, w_padded
 
-    def second_stage_ue_aggregation(self, four_preds_list, four_pred_fine, for_training):
-        four_preds_list, four_pred_fine = self.ue_aggregation(self, four_preds_list, four_pred_fine)
+    def second_stage_ue_aggregation(self, four_preds_list, four_pred_fine, alpha, for_training):
+        four_preds_list, four_pred_fine = self.ue_aggregation(self, four_preds_list, four_pred_fine, alpha, for_training)
         return four_preds_list, four_pred_fine
 
     def first_stage_ue_generate_bbox(self):
@@ -419,7 +420,7 @@ class UAGL():
         bbox_s = bbox.bbox_generator(x_start, y_start, w, w)
         return bbox_s
 
-    def ue_aggregation(self, four_preds_list, four_pred):
+    def ue_aggregation(self, four_preds_list, four_pred, alpha, for_training):
         four_pred = four_pred.view(four_pred.shape[0]//5, 5, 2, 2, 2)
         std_four_pred = torch.std(four_pred, dim=1)
         if self.args.ue_agg == "mean":
@@ -452,15 +453,6 @@ class UAGL():
                     four_preds_list[i] = mean_four_pred_single
                 elif self.args.ue_agg == "zero":
                     four_preds_list[i] = four_pred_single[:, 0]
-        return four_preds_list, four_pred
-
-    def calibrate_shift(self, four_preds_list, four_pred):
-        # bbox_s = self.first_stage_ue_generate_bbox()
-        # bbox_s_swap = torch.stack([bbox_s[:, 0], bbox_s[:, 1], bbox_s[:, 3], bbox_s[:, 2]], dim=1)
-        # four_point_ori_five_crop = bbox_s_swap.permute(0, 2, 1). view(-1, 2, 2, 2)
-        # four_point_1 = flow_4cor + four_point_ori_five_crop
-        # H = tgm.get_perspective_transform(four_point_org, four_point_1)
-        # four_pred = four_preds_list[-1]
         return four_preds_list, four_pred
 
     # def backward_D(self):
