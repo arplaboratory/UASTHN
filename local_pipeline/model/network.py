@@ -419,40 +419,42 @@ class UAGL():
         return bbox_s
 
     def ue_aggregation(self, four_preds_list, four_pred, alpha, for_training):
-        # four_pred = four_pred.view(four_pred.shape[0]//5, 5, 2, 2, 2)
-        # std_four_pred = torch.std(four_pred, dim=1)
-        # if self.args.ue_agg == "mean":
-        #     mean_four_pred = torch.mean(four_pred, dim=1)
-        # resized_rej_std = self.args.ue_rej_std / alpha
-        # resize_maj_vote_rej = self.args.ue_maj_vote_rej / alpha
-        # for i in range(len(four_pred)):
-        #     if (std_four_pred[i] <= resized_rej_std).all() or for_training:
-        #         if self.args.ue_agg == "mean":
-        #             four_pred[i, 0] = mean_four_pred[i]
-        #         elif self.args.ue_agg == "zero":
-        #             pass
-        #         elif self.args.ue_agg == "maj_vote":
-        #             four_pred_sum = four_pred[i, 0].clone()
-        #             count = 1
-        #             for j in range(1,5):
-        #                 if torch.norm(four_pred[i, 0] - four_pred[i, j]) <= resize_maj_vote_rej:
-        #                     four_pred_sum+=four_pred[i, j]
-        #                     count+=1
-        #             four_pred_sum/=count
-        #             four_pred[i, 0] = four_pred_sum
-        #     else:
-        #         four_pred[i, 0] = torch.ones_like(four_pred[i, 0]) * float('nan')
-        # four_pred_new = four_pred[:, 0]
-        four_preds_list_new = []
-        if for_training:
-            for i in range(len(four_preds_list)):
-                four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//5, 5, 2, 2, 2)
+        four_pred_five_crops = four_pred.view(four_pred.shape[0]//5, 5, 2, 2, 2)
+        std_four_pred_five_crops = torch.std(four_pred_five_crops, dim=1)
+        if self.args.ue_agg == "mean":
+            mean_four_pred_five_crops = torch.mean(four_pred_five_crops, dim=1)
+        resized_rej_std = self.args.ue_rej_std / alpha
+        resize_maj_vote_rej = self.args.ue_maj_vote_rej / alpha
+        four_pred_agg_list = []
+        for i in range(len(four_pred_five_crops)):
+            if (std_four_pred_five_crops[i] <= resized_rej_std).all() or for_training:
                 if self.args.ue_agg == "mean":
-                    mean_four_pred_single = torch.mean(four_pred_single, dim=1)
-                    four_preds_list_new.append(mean_four_pred_single)
+                    four_pred_agg = mean_four_pred_five_crops[i]
                 elif self.args.ue_agg == "zero":
-                    four_preds_list_new.append(four_pred_single[:, 0])
-        four_pred_new = four_preds_list_new[-1]
+                    four_pred_agg = four_pred_five_crops[i, 0]
+                elif self.args.ue_agg == "maj_vote":
+                    four_pred_agg = four_pred_five_crops[i, 0].clone()
+                    count = 1
+                    for j in range(1,5):
+                        if torch.norm(four_pred_five_crops[i, 0] - four_pred_five_crops[i, j]) <= resize_maj_vote_rej:
+                            four_pred_agg+=four_pred_five_crops[i, j]
+                            count+=1
+                    four_pred_agg/=count
+            else:
+                four_pred_agg = torch.ones_like(four_pred_five_crops[i, 0]) * float('nan')
+            four_pred_agg_list.append(four_pred_agg)
+        four_pred_new = torch.stack(four_pred_agg_list)
+        four_preds_list_new = []
+        for i in range(len(four_preds_list)):
+            four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//5, 5, 2, 2, 2)
+            if self.args.ue_agg == "mean":
+                mean_four_pred_single = torch.mean(four_pred_single, dim=1)
+                four_preds_list_new.append(mean_four_pred_single)
+            elif self.args.ue_agg == "zero":
+                four_preds_list_new.append(four_pred_single[:, 0])
+            elif self.args.ue_agg == "maj_vote":
+                mean_four_pred_single = torch.mean(four_pred_single, dim=1)
+                four_preds_list_new.append(mean_four_pred_single)
         return four_preds_list_new, four_pred_new
 
     # def backward_D(self):
