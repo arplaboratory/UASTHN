@@ -265,11 +265,14 @@ class UAGL():
             else:
                 self.four_preds_list, self.four_pred = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
             if self.args.first_stage_ue:
-                raise NotImplementedError()
+                self.four_preds_list, self.four_pred = self.first_stage_ue_aggregation(self.four_preds_list, self.four_pred, for_training)
+                B5, C, H, W = self.image_2.shape
+                self.image_1_multi = self.image_1
+                self.image_2_multi = self.image_2
+                self.image_1 = self.image_1.view(B5//5, 5, C, H, W)[:, 0]
+                self.image_2 = self.image_2.view(B5//5, 5, C, H, W)[:, 0]
             # time2 = time.time()
             # logging.debug("Time for 1st forward pass: " + str(time2 - time1) + " seconds")
-            if self.args.first_stage_ue:
-                self.four_preds_list, self.four_pred = self.first_stage_ue_aggregation(self.four_preds_list, self.four_pred, for_training)
             if self.args.two_stages:
                 # self.four_pred = self.flow_4cor # DEBUG
                 # self.four_preds_list[-1] = self.four_pred # DEBUG
@@ -404,19 +407,14 @@ class UAGL():
     def first_stage_ue_generate_bbox(self):
         beta = 512 / self.args.resize_width
         resized_ue_shift = self.args.ue_shift / beta
-        x_start = torch.zeros((self.image_2.shape[0]*5)).to(self.image_2.device)
-        y_start = torch.zeros((self.image_2.shape[0]*5)).to(self.image_2.device)
-        x_shift = torch.tensor([0, 0, resized_ue_shift, 0, resized_ue_shift]).unsqueeze(0).to(self.image_2.device) # on 256x256
-        y_shift = torch.tensor([0, 0, 0, resized_ue_shift, resized_ue_shift]).unsqueeze(0).to(self.image_2.device)
+        x_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
+        y_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
+        x_shift = torch.tensor([0, 0, resized_ue_shift, 0, resized_ue_shift]).repeat(self.image_2.shape[0]//5).to(self.image_2.device) # on 256x256
+        y_shift = torch.tensor([0, 0, 0, resized_ue_shift, resized_ue_shift]).repeat(self.image_2.shape[0]//5).to(self.image_2.device)
         w = torch.tensor([self.args.resize_width, self.args.resize_width - resized_ue_shift, self.args.resize_width - resized_ue_shift,
-                            self.args.resize_width - resized_ue_shift, self.args.resize_width - resized_ue_shift]).unsqueeze(0).to(self.image_2.device)
-        x_start = x_start.unsqueeze(1).repeat(1, 5)
-        y_start = y_start.unsqueeze(1).repeat(1, 5)
+                            self.args.resize_width - resized_ue_shift, self.args.resize_width - resized_ue_shift]).repeat(self.image_2.shape[0]//5).to(self.image_2.device)
         x_start += x_shift
         y_start += y_shift
-        x_start = x_start.view(-1)
-        y_start = y_start.view(-1)
-        w = w.unsqueeze(1).repeat(1, 5).view(-1)
         bbox_s = bbox.bbox_generator(x_start, y_start, w, w)
         return bbox_s
 
