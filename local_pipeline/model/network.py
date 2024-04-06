@@ -402,7 +402,7 @@ class UAGL():
 
     def second_stage_ue_aggregation(self, four_preds_list, four_pred_fine, alpha, for_training):
         four_preds_list, four_pred_fine, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, four_pred_fine, alpha, for_training)
-        return four_preds_list, four_pred_fine, std_four_pred_five_crops
+        return four_preds_list, four_pred_fine
 
     def first_stage_ue_generate_bbox(self):
         beta = 512 / self.args.resize_width
