@@ -383,7 +383,7 @@ class UAGL():
 
     def first_stage_ue_aggregation(self, four_preds_list, four_pred, for_training):
         alpha = self.args.database_size / self.args.resize_width
-        four_preds_list, four_pred = self.ue_aggregation(four_preds_list, four_pred, alpha, for_training)
+        four_preds_list, four_pred, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, four_pred, alpha, for_training)
         return four_preds_list, four_pred
 
     def second_stage_ue_generate(self, x_start, y_start, image_1_ori, w_padded):
@@ -401,8 +401,8 @@ class UAGL():
         return x_start, y_start, image_1_ori, w_padded
 
     def second_stage_ue_aggregation(self, four_preds_list, four_pred_fine, alpha, for_training):
-        four_preds_list, four_pred_fine = self.ue_aggregation(four_preds_list, four_pred_fine, alpha, for_training)
-        return four_preds_list, four_pred_fine
+        four_preds_list, four_pred_fine, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, four_pred_fine, alpha, for_training)
+        return four_preds_list, four_pred_fine, std_four_pred_five_crops
 
     def first_stage_ue_generate_bbox(self):
         beta = 512 / self.args.resize_width
@@ -423,25 +423,21 @@ class UAGL():
         std_four_pred_five_crops = torch.std(four_pred_five_crops, dim=1)
         if self.args.ue_agg == "mean":
             mean_four_pred_five_crops = torch.mean(four_pred_five_crops, dim=1)
-        resized_rej_std = self.args.ue_rej_std / alpha
         resize_maj_vote_rej = self.args.ue_maj_vote_rej / alpha
         four_pred_agg_list = []
         for i in range(len(four_pred_five_crops)):
-            if (std_four_pred_five_crops[i] <= resized_rej_std).all() or for_training:
-                if self.args.ue_agg == "mean":
-                    four_pred_agg = mean_four_pred_five_crops[i]
-                elif self.args.ue_agg == "zero":
-                    four_pred_agg = four_pred_five_crops[i, 0]
-                elif self.args.ue_agg == "maj_vote":
-                    four_pred_agg = four_pred_five_crops[i, 0].clone()
-                    count = 1
-                    for j in range(1,5):
-                        if torch.norm(four_pred_five_crops[i, 0] - four_pred_five_crops[i, j]) <= resize_maj_vote_rej:
-                            four_pred_agg+=four_pred_five_crops[i, j]
-                            count+=1
-                    four_pred_agg/=count
-            else:
-                four_pred_agg = torch.ones_like(four_pred_five_crops[i, 0]) * float('nan')
+            if self.args.ue_agg == "mean":
+                four_pred_agg = mean_four_pred_five_crops[i]
+            elif self.args.ue_agg == "zero":
+                four_pred_agg = four_pred_five_crops[i, 0]
+            elif self.args.ue_agg == "maj_vote":
+                four_pred_agg = four_pred_five_crops[i, 0].clone()
+                count = 1
+                for j in range(1,5):
+                    if torch.norm(four_pred_five_crops[i, 0] - four_pred_five_crops[i, j]) <= resize_maj_vote_rej:
+                        four_pred_agg+=four_pred_five_crops[i, j]
+                        count+=1
+                four_pred_agg/=count
             four_pred_agg_list.append(four_pred_agg)
         four_pred_new = torch.stack(four_pred_agg_list)
         four_preds_list_new = []
@@ -452,10 +448,10 @@ class UAGL():
                 four_preds_list_new.append(mean_four_pred_single)
             elif self.args.ue_agg == "zero":
                 four_preds_list_new.append(four_pred_single[:, 0])
-            elif self.args.ue_agg == "maj_vote":
+            elif self.args.ue_agg == "maj_vote": # mean for training
                 mean_four_pred_single = torch.mean(four_pred_single, dim=1)
                 four_preds_list_new.append(mean_four_pred_single)
-        return four_preds_list_new, four_pred_new
+        return four_preds_list_new, four_pred_new, std_four_pred_five_crops
 
     # def backward_D(self):
     #     """Calculate GAN loss for the discriminator"""
