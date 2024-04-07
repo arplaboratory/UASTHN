@@ -378,11 +378,11 @@ class UAGL():
         B, C, H, W = self.image_2.shape
         self.image_1 = self.image_1.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
         self.image_2 = self.image_2.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
-        if self.args.ue_agg_method == "shift":
+        if self.args.ue_aug_method == "shift":
             bbox_s = self.first_stage_ue_generate_bbox()
             self.image_2 = tgm.crop_and_resize(self.image_2, bbox_s, (self.args.resize_width, self.args.resize_width))
-        elif self.args.ue_agg_method == "mask":
-            mask = torch.randn((image_2.shape[0], 1, size//self.args.ue_mask_patchsize, size//self.args.ue_mask_patchsize)) < prob
+        elif self.args.ue_aug_method == "mask":
+            mask = torch.randn((self.image_2.shape[0], 1, self.image_2.shape[2]//self.args.ue_mask_patchsize, self.image_2.shape[3]//self.args.ue_mask_patchsize)).to(self.image_2.device) < self.args.ue_mask_prob
             mask = torch.repeat_interleave(torch.repeat_interleave(mask, self.args.ue_mask_patchsize, dim=2), self.args.ue_mask_patchsize, dim=3)
             self.image_2 = self.image_2 * mask            
 
