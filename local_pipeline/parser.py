@@ -59,9 +59,12 @@ def parse_arguments():
     parser.add_argument('--first_stage_ue', action="store_true")
     parser.add_argument('--second_stage_ue', action="store_true")
     parser.add_argument('--ue_shift', type=int, default=64)
+    parser.add_argument('--ue_mask_prob', type=float, default=0.5)
+    parser.add_argument('--ue_mask_patchsize', type=int, default=16)
+    parser.add_augument('--ue_aug_method', type=str, default="shift", choices=["shift", "mask"])
     parser.add_argument('--ue_agg', type=str, choices=["mean", "zero", "maj_vote"], default="mean")
-    parser.add_argument('--ue_rej_std', type=float, default=30.0)
-    parser.add_argument('--ue_maj_vote_rej', type=float, default=30.0)
+    parser.add_argument('--ue_rej_std', type=float, default=32.0)
+    parser.add_argument('--ue_maj_vote_rej', type=float, default=32.0)
     args = parser.parse_args()
     args.save_dir = "local_he"
     args.augment_type = "center"
