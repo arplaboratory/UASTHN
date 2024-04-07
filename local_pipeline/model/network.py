@@ -102,8 +102,8 @@ class IHN(nn.Module):
         if self.imagenet_mean is None:
             self.imagenet_mean = torch.Tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(image1.device)
             self.imagenet_std = torch.Tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(image1.device)
-        image1 = (image1 - self.imagenet_mean) / self.imagenet_std
-        image2 = (image2 - self.imagenet_mean) / self.imagenet_std
+        image1 = (image1.contiguous() - self.imagenet_mean) / self.imagenet_std
+        image2 = (image2.contiguous() - self.imagenet_mean) / self.imagenet_std
 
         # time1 = time.time()
         with autocast(enabled=self.args.mixed_precision):
