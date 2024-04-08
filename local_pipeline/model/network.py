@@ -382,9 +382,11 @@ class UAGL():
             bbox_s = self.first_stage_ue_generate_bbox()
             self.image_2 = tgm.crop_and_resize(self.image_2, bbox_s, (self.args.resize_width, self.args.resize_width))
         elif self.args.ue_aug_method == "mask":
-            mask = torch.randn((self.image_2.shape[0], 1, self.image_2.shape[2]//self.args.ue_mask_patchsize, self.image_2.shape[3]//self.args.ue_mask_patchsize)).to(self.image_2.device) < self.args.ue_mask_prob
-            mask = torch.repeat_interleave(torch.repeat_interleave(mask, self.args.ue_mask_patchsize, dim=2), self.args.ue_mask_patchsize, dim=3)
-            self.image_2 = self.image_2 * mask            
+            self.image_2 = self.image_2.view(B, 5, C, H, W)
+            mask = torch.randn((self.image_2.shape[0], 4, 1, self.image_2.shape[3]//self.args.ue_mask_patchsize, self.image_2.shape[4]//self.args.ue_mask_patchsize)).to(self.image_2.device) < self.args.ue_mask_prob
+            mask = torch.repeat_interleave(torch.repeat_interleave(mask, self.args.ue_mask_patchsize, dim=3), self.args.ue_mask_patchsize, dim=4)
+            self.image_2[:, 1:] = self.image_2[:, 1:] * mask
+            self.image_2 = self.image_2.view(B*5, C, H, W)            
 
     def first_stage_ue_aggregation(self, four_preds_list, four_pred, for_training):
         alpha = self.args.database_size / self.args.resize_width
@@ -617,6 +619,6 @@ def mywarp(x, flow_pred, four_point_org_single):
             H = torch.eye(3).to(four_point_org.device).repeat(four_point_1.shape[0],1,1)
         warped_image = tgm.warp_perspective(x, H, (x.shape[2], x.shape[3]))
     else:
-        logging.debug("Output NaN by uncertainty rejection or model error.")
+        logging.debug("Output NaN by model error.")
         warped_image = x
     return warped_image
