@@ -55,7 +55,7 @@ def save_overlap_img(img1, img2, path):
     plt.savefig(path, bbox_inches='tight')
     plt.close()
 
-def save_overlap_bbox_img(img1, img2, path, four_point_gt, four_point_pred, crop_bbox=None):
+def save_overlap_bbox_img(img1, img2, path, four_point_gt, four_point_pred, crop_bbox=None, ue_mask=None):
     four_point_gt = np.round(four_point_gt.cpu().numpy())
     four_point_pred = np.round(four_point_pred.cpu().numpy())
     plt.figure(figsize=(50, 10), dpi=200)
@@ -93,6 +93,8 @@ def save_overlap_bbox_img(img1, img2, path, four_point_gt, four_point_pred, crop
     img2 = np.array(img2_tensor.permute(1, 2, 0)).astype(np.uint8)
     plt.imshow(img2)
     plt.imshow(img1, alpha=0.25)
+    if not ue_mask.all():
+        path = path.split('.')[0]+"_rej.png"
     plt.savefig(path, bbox_inches='tight', pad_inches=0)
     plt.close()
     

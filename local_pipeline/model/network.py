@@ -592,7 +592,7 @@ class UAGL():
         if self.args.use_ue and self.args.D_net != "ue_branch":
             self.scheduler_D.step()
 
-def mywarp(x, flow_pred, four_point_org_single):
+def mywarp(x, flow_pred, four_point_org_single, ue_std=None):
     """
     warp an image/tensor (im2) back to im1, according to the optical flow
     x: [B, C, H, W] (im2)

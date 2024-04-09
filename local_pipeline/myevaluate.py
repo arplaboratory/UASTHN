@@ -80,8 +80,9 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
 
     total_mace = torch.empty(0)
     total_flow = torch.empty(0)
-    total_ce =torch.empty(0)
+    total_ce = torch.empty(0)
     total_mace_conf_error = torch.empty(0)
+    total_ue_mask = torch.empty(0)
     timeall=[]
     mace_conf_list = []
     for i_batch, data_blob in enumerate(tqdm(val_dataset)):
@@ -118,8 +119,15 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
             mace_ = ((mace_[:,0,:,:] + mace_[:,1,:,:])**0.5)
             mace_vec = torch.mean(torch.mean(mace_, dim=1), dim=1)
             # print(mace_[0,:])
+            ue_mask = torch.ones_like(mace_vec)
+            if args.first_stage_ue:
+                ue_std = model.std_four_pred_five_crops.view(model.std_four_pred_five_crops.shape[0], -1)
+                beta = 512 / args.resize_width
+                ue_mask = torch.any(ue_std < args.ue_rej_std / beta, dim=1).cpu()
+            total_ue_mask = torch.cat([total_ue_mask, ue_mask], dim=0)
+            final_ue_mask = torch.count_nonzero(total_ue_mask)/len(total_ue_mask)
 
-            total_mace = torch.cat([total_mace,mace_vec], dim=0)
+            total_mace = torch.cat([total_mace,mace_vec*ue_mask], dim=0)
             final_mace = torch.mean(total_mace).item()
             total_flow = torch.cat([total_flow,flow_vec], dim=0)
             final_flow = torch.mean(total_flow).item()
@@ -150,7 +158,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
             ce_ = (center_pred_offset - center_gt_offset)**2
             ce_ = ((ce_[:,0] + ce_[:,1])**0.5)
             ce_vec = ce_
-            total_ce = torch.cat([total_ce, ce_vec], dim=0)
+            total_ce = torch.cat([total_ce, ce_vec*ue_mask], dim=0)
             final_ce = torch.mean(total_ce).item()
             
             if args.vis_all:
@@ -158,7 +166,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
                 if not os.path.exists(save_dir):
                     os.mkdir(save_dir)
                 if not args.two_stages:
-                    save_overlap_bbox_img(model.image1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1)
+                    save_overlap_bbox_img(model.image_1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, ue_mask=ue_mask)
                 else:
                     four_point_org_single_ori = torch.zeros((1, 2, 2, 2))
                     four_point_org_single_ori[:, :, 0, 0] = torch.Tensor([0, 0])
@@ -168,7 +176,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
                     four_point_bbox = model.flow_bbox.cpu().detach() + four_point_org_single_ori
                     alpha = args.database_size / args.resize_width
                     four_point_bbox = four_point_bbox.flatten(2).permute(0, 2, 1).contiguous() / alpha
-                    save_overlap_bbox_img(model.img1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox)
+                    save_overlap_bbox_img(model.image_1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox, ue_mask=ue_mask)
                 
         if not args.identity:
             if args.use_ue:
@@ -196,11 +204,14 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     if not args.train_ue_method == "train_only_ue_raw_input":
         logging.info(f"MACE Metric: {final_mace}")
         logging.info(f'CE Metric: {final_ce}')
+        logging.info(f'Failure rate:{final_ue_mask}')
         print(f"MACE Metric: {final_mace}")
         print(f'CE Metric: {final_ce}')
+        print(f'Failure rate:{final_ue_mask}')
         if wandb_log:
             wandb.log({"test_mace": final_mace})
             wandb.log({"test_ce": final_ce})
+            wandb.log({"failure_rate": final_ue_mask})
     if args.use_ue:
         mace_conf_list = np.array(mace_conf_list)
         # plot mace conf
