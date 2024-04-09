@@ -207,11 +207,11 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         logging.info(f'Failure rate:{final_ue_mask}')
         print(f"MACE Metric: {final_mace}")
         print(f'CE Metric: {final_ce}')
-        print(f'Failure rate:{final_ue_mask}')
+        print(f'Success rate:{final_ue_mask}')
         if wandb_log:
             wandb.log({"test_mace": final_mace})
             wandb.log({"test_ce": final_ce})
-            wandb.log({"failure_rate": final_ue_mask})
+            wandb.log({"success_rate": final_ue_mask})
     if args.use_ue:
         mace_conf_list = np.array(mace_conf_list)
         # plot mace conf
