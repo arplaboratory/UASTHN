@@ -237,8 +237,8 @@ class UAGL():
             B5, C, H, W = self.image_2.shape
             self.image_1_multi = self.image_1
             self.image_2_multi = self.image_2
-            self.image_1 = self.image_1.view(B5//5, 5, C, H, W)[:, 0]
-            self.image_2 = self.image_2.view(B5//5, 5, C, H, W)[:, 0]
+            self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
+            self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
         # time2 = time.time()
         # logging.debug("Time for 1st forward pass: " + str(time2 - time1) + " seconds")
         if self.args.two_stages:
@@ -252,7 +252,7 @@ class UAGL():
             # time1 = time.time()
             if self.args.second_stage_ue:
                 B, C, H, W = self.image_2.shape
-                self.image_2_crop = self.image_2.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
+                self.image_2_crop = self.image_2.unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C, H, W)
             else:
                 self.image_2_crop = self.image_2
             self.four_preds_list_fine, self.four_pred_fine = self.netG_fine(image1=self.image_1_crop, image2=self.image_2_crop, iters_lev0=self.args.iters_lev1)
@@ -263,8 +263,8 @@ class UAGL():
             if self.args.second_stage_ue:
                 B, C1, C2, C3 = self.four_preds_list[-1].shape
                 for i in range(len(self.four_preds_list)):
-                    self.four_preds_list[i] = self.four_preds_list[i].unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C1, C2, C3)
-                self.four_pred = self.four_pred.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C1, C2, C3)
+                    self.four_preds_list[i] = self.four_preds_list[i].unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C1, C2, C3)
+                self.four_pred = self.four_pred.unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C1, C2, C3)
             self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox, for_training)
         self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
 
@@ -329,17 +329,17 @@ class UAGL():
 
     def first_stage_ue_generate(self):
         B, C, H, W = self.image_2.shape
-        self.image_1 = self.image_1.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
-        self.image_2 = self.image_2.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
+        self.image_1 = self.image_1.unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C, H, W)
+        self.image_2 = self.image_2.unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C, H, W)
         if self.args.ue_aug_method == "shift":
             bbox_s = self.first_stage_ue_generate_bbox()
             self.image_2 = tgm.crop_and_resize(self.image_2, bbox_s, (self.args.resize_width, self.args.resize_width))
         elif self.args.ue_aug_method == "mask":
-            self.image_2 = self.image_2.view(B, 5, C, H, W)
+            self.image_2 = self.image_2.view(B, self.args.ue_num_crops, C, H, W)
             mask = torch.randn((self.image_2.shape[0], 4, 1, self.image_2.shape[3]//self.args.ue_mask_patchsize, self.image_2.shape[4]//self.args.ue_mask_patchsize)).to(self.image_2.device) < self.args.ue_mask_prob
             mask = torch.repeat_interleave(torch.repeat_interleave(mask, self.args.ue_mask_patchsize, dim=3), self.args.ue_mask_patchsize, dim=4)
             self.image_2[:, 1:] = self.image_2[:, 1:] * mask
-            self.image_2 = self.image_2.view(B*5, C, H, W)            
+            self.image_2 = self.image_2.view(B*self.args.ue_num_crops, C, H, W)            
 
     def first_stage_ue_aggregation(self, four_preds_list, four_pred, for_training):
         alpha = self.args.database_size / self.args.resize_width
@@ -349,15 +349,15 @@ class UAGL():
     def second_stage_ue_generate(self, x_start, y_start, image_1_ori, w_padded):
         x_shift = torch.tensor([0, self.args.ue_shift, self.args.ue_shift, -self.args.ue_shift, -self.args.ue_shift]).unsqueeze(0).to(x_start.device)
         y_shift = torch.tensor([0, self.args.ue_shift, -self.args.ue_shift, -self.args.ue_shift, self.args.ue_shift]).unsqueeze(0).to(y_start.device)
-        x_start = x_start.unsqueeze(1).repeat(1, 5)
-        y_start = y_start.unsqueeze(1).repeat(1, 5)
+        x_start = x_start.unsqueeze(1).repeat(1, self.args.ue_num_crops)
+        y_start = y_start.unsqueeze(1).repeat(1, self.args.ue_num_crops)
         x_start += x_shift
         y_start += y_shift
         x_start = x_start.view(-1)
         y_start = y_start.view(-1)
         B, C, H, W = image_1_ori.shape
-        image_1_ori = image_1_ori.unsqueeze(1).repeat(1, 5, 1, 1, 1).view(B*5, C, H, W)
-        w_padded = w_padded.unsqueeze(1).repeat(1, 5).view(-1)
+        image_1_ori = image_1_ori.unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C, H, W)
+        w_padded = w_padded.unsqueeze(1).repeat(1, self.args.ue_num_crops).view(-1)
         return x_start, y_start, image_1_ori, w_padded
 
     def second_stage_ue_aggregation(self, four_preds_list, four_pred_fine, alpha, for_training):
@@ -369,17 +369,25 @@ class UAGL():
         resized_ue_shift = self.args.ue_shift / beta
         x_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
         y_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
-        x_shift = torch.tensor([0, 0, resized_ue_shift, 0, resized_ue_shift]).repeat(self.image_2.shape[0]//5).to(self.image_2.device) # on 256x256
-        y_shift = torch.tensor([0, 0, 0, resized_ue_shift, resized_ue_shift]).repeat(self.image_2.shape[0]//5).to(self.image_2.device)
-        w = torch.tensor([self.args.resize_width, self.args.resize_width - resized_ue_shift, self.args.resize_width - resized_ue_shift,
-                            self.args.resize_width - resized_ue_shift, self.args.resize_width - resized_ue_shift]).repeat(self.image_2.shape[0]//5).to(self.image_2.device)
+        if self.args.ue_num_crops == 5:
+            x_shift = torch.tensor([0, 0, resized_ue_shift, 0, resized_ue_shift]).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
+            y_shift = torch.tensor([0, 0, 0, resized_ue_shift, resized_ue_shift]).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
+            w = torch.tensor([self.args.resize_width, self.args.resize_width - resized_ue_shift, self.args.resize_width - resized_ue_shift,
+                                self.args.resize_width - resized_ue_shift, self.args.resize_width - resized_ue_shift]).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
+        else:
+            x_shift_random = [random.randint(0, resized_ue_shift) for i in range(self.args.ue_num_crops - 1)]
+            y_shift_random = [random.randint(0, resized_ue_shift) for i in range(self.args.ue_num_crops - 1)]
+            w_random = [self.args.resize_width - resized_ue_shift for i in range(self.args.ue_num_crops - 1)]
+            x_shift = torch.tensor([0] + x_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
+            y_shift = torch.tensor([0] + y_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
+            w = torch.tensor([self.args.resize_width] + w_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
         x_start += x_shift
         y_start += y_shift
         bbox_s = bbox.bbox_generator(x_start, y_start, w, w)
         return bbox_s
 
     def ue_aggregation(self, four_preds_list, four_pred, alpha, for_training):
-        four_pred_five_crops = four_pred.view(four_pred.shape[0]//5, 5, 2, 2, 2)
+        four_pred_five_crops = four_pred.view(four_pred.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
         std_four_pred_five_crops = torch.std(four_pred_five_crops, dim=1)
         if self.args.ue_agg == "mean":
             mean_four_pred_five_crops = torch.mean(four_pred_five_crops, dim=1)
@@ -393,7 +401,7 @@ class UAGL():
             elif self.args.ue_agg == "maj_vote":
                 four_pred_agg = four_pred_five_crops[i, 0].clone()
                 count = 1
-                for j in range(1,5):
+                for j in range(1,self.args.ue_num_crops):
                     if torch.norm(four_pred_five_crops[i, 0] - four_pred_five_crops[i, j]) <= resize_maj_vote_rej:
                         four_pred_agg+=four_pred_five_crops[i, j]
                         count+=1
@@ -402,7 +410,7 @@ class UAGL():
         four_pred_new = torch.stack(four_pred_agg_list)
         four_preds_list_new = []
         for i in range(len(four_preds_list)):
-            four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//5, 5, 2, 2, 2)
+            four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
             if self.args.ue_agg == "mean":
                 mean_four_pred_single = torch.mean(four_pred_single, dim=1)
                 four_preds_list_new.append(mean_four_pred_single)
