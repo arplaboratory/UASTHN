@@ -49,6 +49,7 @@ def parse_arguments():
     parser.add_argument('--second_stage_ue', action="store_true")
     parser.add_argument('--ue_shift', type=int, default=64)
     parser.add_argument('--ue_num_crops', type=int, default=5, choices=[5, 10])
+    parser.add_argument('--ue_shift_crops_types', type=str, default="grid", choices=["grid", "random"])
     parser.add_argument('--ue_mask_prob', type=float, default=0.5)
     parser.add_argument('--ue_mask_patchsize', type=int, default=16)
     parser.add_argument('--ue_aug_method', type=str, default="shift", choices=["shift", "mask"])

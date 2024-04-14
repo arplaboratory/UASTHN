@@ -16,6 +16,7 @@ import random
 import time
 import logging
 from model.baseline import DHN, LocalTrans
+import numpy as np
 
 autocast = torch.cuda.amp.autocast
 class IHN(nn.Module):
@@ -336,7 +337,7 @@ class UAGL():
             self.image_2 = tgm.crop_and_resize(self.image_2, bbox_s, (self.args.resize_width, self.args.resize_width))
         elif self.args.ue_aug_method == "mask":
             self.image_2 = self.image_2.view(B, self.args.ue_num_crops, C, H, W)
-            mask = torch.randn((self.image_2.shape[0], 4, 1, self.image_2.shape[3]//self.args.ue_mask_patchsize, self.image_2.shape[4]//self.args.ue_mask_patchsize)).to(self.image_2.device) < self.args.ue_mask_prob
+            mask = torch.randn((self.image_2.shape[0], int(self.args.ue_num_crops - 1), 1, self.image_2.shape[3]//self.args.ue_mask_patchsize, self.image_2.shape[4]//self.args.ue_mask_patchsize)).to(self.image_2.device) > self.args.ue_mask_prob
             mask = torch.repeat_interleave(torch.repeat_interleave(mask, self.args.ue_mask_patchsize, dim=3), self.args.ue_mask_patchsize, dim=4)
             self.image_2[:, 1:] = self.image_2[:, 1:] * mask
             self.image_2 = self.image_2.view(B*self.args.ue_num_crops, C, H, W)            
@@ -369,18 +370,25 @@ class UAGL():
         resized_ue_shift = self.args.ue_shift / beta
         x_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
         y_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
-        if self.args.ue_num_crops == 5:
-            x_shift = torch.tensor([0, 0, resized_ue_shift, 0, resized_ue_shift]).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
-            y_shift = torch.tensor([0, 0, 0, resized_ue_shift, resized_ue_shift]).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
-            w = torch.tensor([self.args.resize_width, self.args.resize_width - resized_ue_shift, self.args.resize_width - resized_ue_shift,
-                                self.args.resize_width - resized_ue_shift, self.args.resize_width - resized_ue_shift]).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
-        else:
+        if self.args.ue_shift_crops_types == "grid":
+            x_shift_grid = np.linspace(0, resized_ue_shift, int(np.sqrt(self.args.ue_num_crops - 1)))
+            y_shift_grid = np.linspace(0, resized_ue_shift, int(np.sqrt(self.args.ue_num_crops - 1)))
+            x_shift_grid, y_shift_grid = np.meshgrid(x_shift_grid, y_shift_grid)
+            x_shift_grid = list(x_shift_grid.reshape(-1))
+            y_shift_grid = list(y_shift_grid.reshape(-1))
+            w_grid = [self.args.resize_width - resized_ue_shift for i in range(len(x_shift_grid))]
+            x_shift = torch.tensor([0] + x_shift_grid).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
+            y_shift = torch.tensor([0] + y_shift_grid).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
+            w = torch.tensor([self.args.resize_width] + w_grid).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
+        elif self.args.ue_shift_crops_types == "random":
             x_shift_random = [random.randint(0, resized_ue_shift) for i in range(self.args.ue_num_crops - 1)]
             y_shift_random = [random.randint(0, resized_ue_shift) for i in range(self.args.ue_num_crops - 1)]
             w_random = [self.args.resize_width - resized_ue_shift for i in range(self.args.ue_num_crops - 1)]
             x_shift = torch.tensor([0] + x_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
             y_shift = torch.tensor([0] + y_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
             w = torch.tensor([self.args.resize_width] + w_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
+        else:
+            raise NotImplementedError()
         x_start += x_shift
         y_start += y_shift
         bbox_s = bbox.bbox_generator(x_start, y_start, w, w)
