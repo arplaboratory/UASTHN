@@ -153,7 +153,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
 
     logging.info(f"MACE Metric: {final_mace}")
     logging.info(f'CE Metric: {final_ce}')
-    logging.info(f'Failure rate:{final_ue_mask}')
+    logging.info(f'Success rate:{final_ue_mask}')
     print(f"MACE Metric: {final_mace}")
     print(f'CE Metric: {final_ce}')
     print(f'Success rate:{final_ue_mask}')

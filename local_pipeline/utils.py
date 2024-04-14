@@ -165,20 +165,19 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_
             i4cor_loss = (four_preds[i] - flow_4cor).abs()
             ce_loss += i_weight * (i4cor_loss).mean()
 
-    ce_loss = args.G_loss_lambda * ce_loss
     mace = torch.sum((four_preds[-1] - flow_4cor) ** 2, dim=1).sqrt()
     metrics['1px'] = (mace < 1).float().mean().item()
     metrics['3px'] = (mace < 3).float().mean().item()
     metrics['mace'] = mace.mean().item()
+    metrics['ce_loss'] = ce_loss.item()
 
     if four_ue is not None:
         ue_loss = 0.0
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
-            i4cor_loss = (four_preds[i] - flow_4cor)**2
-            i4cor_loss_norm =  torch.exp(args.ue_alpha * (i4cor_loss[:, 0, :, :] + i4cor_loss[:, 1, :, :])**0.5)
-            ue_loss += i_weight * ((four_ue[i] - i4cor_loss_norm).abs()).mean()
-        ce_loss += ue_loss
+            i4cor_loss = (four_ue[i].view(-1, 5, 2, 2, 2)[:, 0] - four_ue_gt)**2
+            ue_loss += i_weight * (i4cor_loss).mean()
+        ce_loss += args.ue_mock_loss_lambda * ue_loss
         metrics['ue_loss'] = ue_loss.item()
 
     return ce_loss, metrics

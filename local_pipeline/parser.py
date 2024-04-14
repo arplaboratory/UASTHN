@@ -26,7 +26,6 @@ def parse_arguments():
     parser.add_argument("--prior_location_threshold", type=int, default=-1, help="The threshold of search region from prior knowledge for train and test. If -1, then no prior knowledge")
     parser.add_argument("--val_positive_dist_threshold", type=int, default=50, help="_")
     parser.add_argument("--G_contrast", type=str, default="none", choices=["none", "manual", "autocontrast", "equalize"], help="G_contrast")
-    parser.add_argument("--G_loss_lambda", type=float, default=1.0, help="G_loss_lambda only for homo")
     parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"])
     parser.add_argument("--permute", type=str, default="none", choices=["none", "img", "ue"])
     parser.add_argument("--database_size", type=int, default=512, choices=[512, 1024, 1536, 2048, 2560], help="database_size")
@@ -56,6 +55,7 @@ def parse_arguments():
     parser.add_argument('--ue_rej_std', type=float, default=32.0)
     parser.add_argument('--ue_maj_vote_rej', type=float, default=32.0)
     parser.add_argument('--ue_mock', action="store_true")
+    parser.add_argument("--ue_mock_loss_lambda", type=float, default=1.0, help="G_loss_lambda only for homo")
     args = parser.parse_args()
     args.save_dir = "local_he"
     args.augment_type = "center"

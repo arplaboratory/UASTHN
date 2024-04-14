@@ -91,7 +91,8 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
                 "mace": metrics["mace"],
                 "lr": metrics["lr"][0],
                 "G_loss": metrics["G_loss"],
-                "ue_loss": metrics["ue_loss"] if args.ue_mock else 0
+                "ue_loss": metrics["ue_loss"] if args.ue_mock else 0,
+                "ce_loss": metrics["ce_loss"]
             },)
         total_steps += 1
         # Validate

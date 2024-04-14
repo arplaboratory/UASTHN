@@ -144,7 +144,7 @@ class IHN(nn.Module):
                     
             four_point_disp =  four_point_disp + delta_four_point[:, :2]
             if self.first_stage and self.args.ue_mock:
-                four_point_ue.append(delta_four_point[:, 2])
+                four_point_ue.append(delta_four_point[:, 2:])
             four_point_predictions.append(four_point_disp)
             coords1 = self.get_flow_now_4(four_point_disp)
         # time2 = time.time()
@@ -421,6 +421,7 @@ class UAGL():
         else:
             self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics) 
         # combine loss and calculate gradients
+        self.loss_G = self.loss_G_Homo
         self.metrics["G_loss"] = self.loss_G.cpu().item()
         self.loss_G.backward()
 
