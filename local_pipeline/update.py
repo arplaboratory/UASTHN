@@ -242,7 +242,7 @@ class CNN_64(nn.Module):
         
         if self.ue_branch:
             self.layer10_ue = nn.Sequential(nn.Conv2d(outputdim_final, outputdim_final, 3,  padding=1, stride=1), nn.GroupNorm(num_groups=(outputdim_final) // 8, num_channels=outputdim_final),
-                                        nn.ReLU(), nn.Conv2d(outputdim_final, 1, 1))
+                                        nn.ReLU(), nn.Conv2d(outputdim_final, 2, 1))
 
     def forward(self, x):
         x = self.layer1(x)

@@ -47,11 +47,10 @@ def main(args):
 
     total_steps = 0
     last_best_val_mace = None
-    last_best_val_mace_conf_error = None
     while total_steps <= args.num_steps:
-        total_steps, last_best_val_mace, last_best_val_mace_conf_error = train(model, train_loader, args, total_steps, last_best_val_mace, last_best_val_mace_conf_error)
+        total_steps, last_best_val_mace = train(model, train_loader, args, total_steps, last_best_val_mace)
         if extended_loader is not None:
-            total_steps, last_best_val_mace, last_best_val_mace_conf_error = train(model, extended_loader, args, total_steps, last_best_val_mace, last_best_val_mace_conf_error, train_step_limit=len(train_loader))
+            total_steps, last_best_val_mace = train(model, extended_loader, args, total_steps, last_best_val_mace, train_step_limit=len(train_loader))
 
     test_dataset = datasets.fetch_dataloader(args, split='test')
     model_med = torch.load(args.save_dir + f'/{args.name}.pth')
@@ -60,7 +59,7 @@ def main(args):
         model.netG_fine.load_state_dict(model_med['netG_fine'])
     evaluate_SNet(model, test_dataset, batch_size=args.batch_size, args=args, wandb_log=True)
 
-def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_val_mace_conf_error, train_step_limit = None):
+def train(model, train_loader, args, total_steps, last_best_val_mace, train_step_limit = None):
     count = 0
     for i_batch, data_blob in enumerate(tqdm(train_loader)):
         tic = time.time()
@@ -97,7 +96,7 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
         total_steps += 1
         # Validate
         if total_steps % args.val_freq == args.val_freq - 1:
-            current_val_mace, current_val_mace_conf_error = validate(model, args, total_steps)
+            current_val_mace = validate(model, args, total_steps)
             # plot_train(logger, args)
             # plot_val(logger, args)
             PATH = args.save_dir + f'/{total_steps+1}_{args.name}.pth'
@@ -121,17 +120,16 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
             break
         else:
             count += 1
-    return total_steps, last_best_val_mace, last_best_val_mace_conf_error
+    return total_steps, last_best_val_mace
 
 def validate(model, args, total_steps):
     results = {}
     # Evaluate results
     results.update(validate_process(model, args, total_steps))
     wandb.log({
-                "val_mace": results['val_mace'],
-                "val_mace_conf_error": results['val_mace_conf_error']
+                "val_mace": results['val_mace']
             })
-    return results['val_mace'], results['val_mace_conf_error']
+    return results['val_mace']
 
 
 if __name__ == "__main__":

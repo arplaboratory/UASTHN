@@ -60,7 +60,6 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     total_mace = torch.empty(0)
     total_flow = torch.empty(0)
     total_ce = torch.empty(0)
-    total_mace_conf_error = torch.empty(0)
     total_ue_mask = torch.empty(0)
     timeall=[]
     mace_conf_list = []
