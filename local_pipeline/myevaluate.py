@@ -25,45 +25,24 @@ import wandb
 def test(args, wandb_log):
     if not args.identity:
         model = UAGL(args)
-        if not args.train_ue_method == "train_only_ue_raw_input":
-            model_med = torch.load(args.eval_model, map_location='cuda:0')
+        model_med = torch.load(args.eval_model, map_location='cuda:0')
+        for key in list(model_med['netG'].keys()):
+            model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
+        for key in list(model_med['netG'].keys()):
+            if key.startswith('module'):
+                del model_med['netG'][key]
+        model.netG.load_state_dict(model_med['netG'], strict=False)
+        if args.two_stages:
+            model_med = torch.load(args.eval_model_fine, map_location='cuda:0')
             for key in list(model_med['netG'].keys()):
                 model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
             for key in list(model_med['netG'].keys()):
                 if key.startswith('module'):
                     del model_med['netG'][key]
-            model.netG.load_state_dict(model_med['netG'], strict=False)
-        if args.use_ue:
-            if args.eval_model_ue is not None:
-                model_med = torch.load(args.eval_model_ue, map_location='cuda:0')
-            for key in list(model_med['netD'].keys()):
-                model_med['netD'][key.replace('module.','')] = model_med['netD'][key]
-            for key in list(model_med['netD'].keys()):
-                if key.startswith('module'):
-                    del model_med['netD'][key]
-            model.netD.load_state_dict(model_med['netD'])
-        if args.two_stages:
-            if args.eval_model_fine is None:
-                model_med = torch.load(args.eval_model, map_location='cuda:0')
-                for key in list(model_med['netG_fine'].keys()):
-                    model_med['netG_fine'][key.replace('module.','')] = model_med['netG_fine'][key]
-                for key in list(model_med['netG_fine'].keys()):
-                    if key.startswith('module'):
-                        del model_med['netG_fine'][key]
-                model.netG_fine.load_state_dict(model_med['netG_fine'])
-            else:
-                model_med = torch.load(args.eval_model_fine, map_location='cuda:0')
-                for key in list(model_med['netG'].keys()):
-                    model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
-                for key in list(model_med['netG'].keys()):
-                    if key.startswith('module'):
-                        del model_med['netG'][key]
-                model.netG_fine.load_state_dict(model_med['netG'], strict=False)
+            model.netG_fine.load_state_dict(model_med['netG'], strict=False)
         
         model.setup() 
         model.netG.eval()
-        if args.use_ue:
-            model.netD.eval()
         if args.two_stages:
             model.netG_fine.eval()
     else:
@@ -100,142 +79,91 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
             flow_4cor[:, :, 0, 1] = flow_gt[:, :, 0, -1]
             flow_4cor[:, :, 1, 0] = flow_gt[:, :, -1, 0]
             flow_4cor[:, :, 1, 1] = flow_gt[:, :, -1, -1]
-            flow_ = (flow_4cor)**2
-            flow_ = ((flow_[:,0,:,:] + flow_[:,1,:,:])**0.5)
-            flow_vec = torch.mean(torch.mean(flow_, dim=1), dim=1)
 
-        if args.train_ue_method != 'train_only_ue_raw_input':
-            if not args.identity:
-                # time_start = time.time()
-                model.forward(use_raw_input=(args.train_ue_method == 'train_only_ue_raw_input'), noise_std=args.noise_std, sample_method=args.sample_method)
-                # time_end = time.time()
-                four_pred = model.four_pred
-                # timeall.append(time_end-time_start)
-                # print(time_end-time_start)
-            else:
-                four_pred = torch.zeros((flow_gt.shape[0], 2, 2, 2))
-
-            mace_ = (flow_4cor - four_pred.cpu().detach())**2
-            mace_ = ((mace_[:,0,:,:] + mace_[:,1,:,:])**0.5)
-            mace_vec = torch.mean(torch.mean(mace_, dim=1), dim=1)
-            # print(mace_[0,:])
-            ue_mask = torch.ones_like(mace_vec)
-            if args.first_stage_ue:
-                ue_std = model.std_four_pred_five_crops.view(model.std_four_pred_five_crops.shape[0], -1)
-                beta = 512 / args.resize_width
-                ue_mask = torch.any(ue_std < args.ue_rej_std / beta, dim=1).cpu()
-            total_ue_mask = torch.cat([total_ue_mask, ue_mask], dim=0)
-            final_ue_mask = torch.count_nonzero(total_ue_mask)/len(total_ue_mask)
-
-            total_mace = torch.cat([total_mace,mace_vec*ue_mask], dim=0)
-            final_mace = torch.mean(total_mace).item()
-            total_flow = torch.cat([total_flow,flow_vec], dim=0)
-            final_flow = torch.mean(total_flow).item()
-            
-            # CE
-            four_point_org_single = torch.zeros((1, 2, 2, 2))
-            four_point_org_single[:, :, 0, 0] = torch.Tensor([0, 0])
-            four_point_org_single[:, :, 0, 1] = torch.Tensor([args.resize_width - 1, 0])
-            four_point_org_single[:, :, 1, 0] = torch.Tensor([0, args.resize_width - 1])
-            four_point_org_single[:, :, 1, 1] = torch.Tensor([args.resize_width - 1, args.resize_width - 1])
-            four_point_1 = four_pred.cpu().detach() + four_point_org_single
-            four_point_org = four_point_org_single.repeat(four_point_1.shape[0],1,1,1).flatten(2).permute(0, 2, 1).contiguous() 
-            four_point_1 = four_point_1.flatten(2).permute(0, 2, 1).contiguous()
-            four_point_gt = flow_4cor.cpu().detach() + four_point_org_single
-            four_point_gt = four_point_gt.flatten(2).permute(0, 2, 1).contiguous()
-            H = tgm.get_perspective_transform(four_point_org, four_point_1)
-            center_T = torch.tensor([args.resize_width/2-0.5, args.resize_width/2-0.5, 1]).unsqueeze(1).unsqueeze(0).repeat(H.shape[0], 1, 1)
-            w = torch.bmm(H, center_T).squeeze(2)
-            center_pred_offset = w[:, :2]/w[:, 2].unsqueeze(1) - center_T[:, :2].squeeze(2)
-            # alpha = args.database_size / args.resize_width
-            # center_gt_offset = (query_utm - database_utm).squeeze(1) / alpha
-            # temp = center_gt_offset[:, 0].clone()
-            # center_gt_offset[:, 0] = center_gt_offset[:, 1]
-            # center_gt_offset[:, 1] = temp # Swap!
-            H_gt = tgm.get_perspective_transform(four_point_org, four_point_gt)
-            w_gt = torch.bmm(H_gt, center_T).squeeze(2)
-            center_gt_offset = w_gt[:, :2]/w_gt[:, 2].unsqueeze(1) - center_T[:, :2].squeeze(2)
-            ce_ = (center_pred_offset - center_gt_offset)**2
-            ce_ = ((ce_[:,0] + ce_[:,1])**0.5)
-            ce_vec = ce_
-            total_ce = torch.cat([total_ce, ce_vec*ue_mask], dim=0)
-            final_ce = torch.mean(total_ce).item()
-            
-            if args.vis_all:
-                save_dir = os.path.join(args.save_dir, 'vis')
-                if not os.path.exists(save_dir):
-                    os.mkdir(save_dir)
-                if not args.two_stages:
-                    save_overlap_bbox_img(model.image_1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, ue_mask=ue_mask)
-                else:
-                    four_point_org_single_ori = torch.zeros((1, 2, 2, 2))
-                    four_point_org_single_ori[:, :, 0, 0] = torch.Tensor([0, 0])
-                    four_point_org_single_ori[:, :, 0, 1] = torch.Tensor([args.database_size - 1, 0])
-                    four_point_org_single_ori[:, :, 1, 0] = torch.Tensor([0, args.database_size - 1])
-                    four_point_org_single_ori[:, :, 1, 1] = torch.Tensor([args.database_size - 1, args.database_size - 1])
-                    four_point_bbox = model.flow_bbox.cpu().detach() + four_point_org_single_ori
-                    alpha = args.database_size / args.resize_width
-                    four_point_bbox = four_point_bbox.flatten(2).permute(0, 2, 1).contiguous() / alpha
-                    save_overlap_bbox_img(model.image_1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox, ue_mask=ue_mask)
-                
         if not args.identity:
-            if args.use_ue:
-                with torch.no_grad():
-                    conf_pred = model.predict_uncertainty(GAN_mode=args.GAN_mode)
-                conf_vec = torch.mean(conf_pred, dim=[1, 2, 3])
-                if args.GAN_mode == "macegan" and args.D_net != "ue_branch":
-                    logging.debug(f"conf_pred_diff:{conf_vec.cpu() - torch.exp(args.ue_alpha * mace_vec)}.")
-                    logging.debug(f"pred_mace:{mace_vec}")
-                    mace_conf_error_vec = F.l1_loss(conf_vec.cpu(), torch.exp(args.ue_alpha * mace_vec))
-                elif args.GAN_mode == "vanilla_rej":
-                    flow_bool = torch.ones_like(flow_vec)
-                    alpha = args.database_size / args.resize_width
-                    flow_bool[flow_vec >= (args.rej_threshold / alpha)] = 0.0
-                    mace_conf_error_vec = F.binary_cross_entropy(conf_vec.cpu(), flow_bool) # sigmoid in predict uncertainty
-                total_mace_conf_error = torch.cat([total_mace_conf_error, mace_conf_error_vec.reshape(1)], dim=0)
-                final_mace_conf_error = torch.mean(total_mace_conf_error).item()
-                if args.GAN_mode == "macegan" and args.D_net != "ue_branch":
-                    for i in range(len(mace_vec)):
-                        mace_conf_list.append((mace_vec[i].item(), conf_vec[i].item()))
-                elif args.GAN_mode == "vanilla_rej":
-                    for i in range(len(flow_vec)):
-                        mace_conf_list.append((flow_vec[i].item(), conf_vec[i].item()))
+            # time_start = time.time()
+            model.forward()
+            # time_end = time.time()
+            four_pred = model.four_pred
+            # timeall.append(time_end-time_start)
+            # print(time_end-time_start)
+        else:
+            four_pred = torch.zeros((flow_gt.shape[0], 2, 2, 2))
 
-    if not args.train_ue_method == "train_only_ue_raw_input":
-        logging.info(f"MACE Metric: {final_mace}")
-        logging.info(f'CE Metric: {final_ce}')
-        logging.info(f'Failure rate:{final_ue_mask}')
-        print(f"MACE Metric: {final_mace}")
-        print(f'CE Metric: {final_ce}')
-        print(f'Success rate:{final_ue_mask}')
-        if wandb_log:
-            wandb.log({"test_mace": final_mace})
-            wandb.log({"test_ce": final_ce})
-            wandb.log({"success_rate": final_ue_mask})
-    if args.use_ue:
-        mace_conf_list = np.array(mace_conf_list)
-        # plot mace conf
-        plt.figure()
-        # plt.axis('equal')
-        plt.scatter(mace_conf_list[:,0], mace_conf_list[:,1], s=1)
-        x = np.linspace(0, 100, 400)
-        y = np.exp(args.ue_alpha * x)
-        plt.plot(x, y, label='f(x) = exp(-0.1x)', color='red')
-        plt.legend()
-        plt.savefig(args.save_dir + f'/final_conf.png')
-        plt.close()
-        plt.figure()
-        n, bins, patches = plt.hist(x=mace_conf_list[:,1], bins=np.linspace(0, 1, 20))
-        logging.info(n)
-        plt.close()
-        logging.info(f"MACE CONF ERROR Metric: {final_mace_conf_error}")
-        if wandb_log:
-            wandb.log({"test_mace_conf_error": final_mace_conf_error})
+        mace_ = (flow_4cor - four_pred.cpu().detach())**2
+        mace_ = ((mace_[:,0,:,:] + mace_[:,1,:,:])**0.5)
+        mace_vec = torch.mean(torch.mean(mace_, dim=1), dim=1)
+        # print(mace_[0,:])
+        ue_mask = torch.ones_like(mace_vec)
+        if args.first_stage_ue:
+            ue_std = model.std_four_pred_five_crops.view(model.std_four_pred_five_crops.shape[0], -1)
+            beta = 512 / args.resize_width
+            ue_mask = torch.any(ue_std < args.ue_rej_std / beta, dim=1).cpu()
+        total_ue_mask = torch.cat([total_ue_mask, ue_mask], dim=0)
+        final_ue_mask = torch.count_nonzero(total_ue_mask)/len(total_ue_mask)
+
+        total_mace = torch.cat([total_mace,mace_vec*ue_mask], dim=0)
+        final_mace = torch.mean(total_mace).item()
+        
+        # CE
+        four_point_org_single = torch.zeros((1, 2, 2, 2))
+        four_point_org_single[:, :, 0, 0] = torch.Tensor([0, 0])
+        four_point_org_single[:, :, 0, 1] = torch.Tensor([args.resize_width - 1, 0])
+        four_point_org_single[:, :, 1, 0] = torch.Tensor([0, args.resize_width - 1])
+        four_point_org_single[:, :, 1, 1] = torch.Tensor([args.resize_width - 1, args.resize_width - 1])
+        four_point_1 = four_pred.cpu().detach() + four_point_org_single
+        four_point_org = four_point_org_single.repeat(four_point_1.shape[0],1,1,1).flatten(2).permute(0, 2, 1).contiguous() 
+        four_point_1 = four_point_1.flatten(2).permute(0, 2, 1).contiguous()
+        four_point_gt = flow_4cor.cpu().detach() + four_point_org_single
+        four_point_gt = four_point_gt.flatten(2).permute(0, 2, 1).contiguous()
+        H = tgm.get_perspective_transform(four_point_org, four_point_1)
+        center_T = torch.tensor([args.resize_width/2-0.5, args.resize_width/2-0.5, 1]).unsqueeze(1).unsqueeze(0).repeat(H.shape[0], 1, 1)
+        w = torch.bmm(H, center_T).squeeze(2)
+        center_pred_offset = w[:, :2]/w[:, 2].unsqueeze(1) - center_T[:, :2].squeeze(2)
+        # alpha = args.database_size / args.resize_width
+        # center_gt_offset = (query_utm - database_utm).squeeze(1) / alpha
+        # temp = center_gt_offset[:, 0].clone()
+        # center_gt_offset[:, 0] = center_gt_offset[:, 1]
+        # center_gt_offset[:, 1] = temp # Swap!
+        H_gt = tgm.get_perspective_transform(four_point_org, four_point_gt)
+        w_gt = torch.bmm(H_gt, center_T).squeeze(2)
+        center_gt_offset = w_gt[:, :2]/w_gt[:, 2].unsqueeze(1) - center_T[:, :2].squeeze(2)
+        ce_ = (center_pred_offset - center_gt_offset)**2
+        ce_ = ((ce_[:,0] + ce_[:,1])**0.5)
+        ce_vec = ce_
+        total_ce = torch.cat([total_ce, ce_vec*ue_mask], dim=0)
+        final_ce = torch.mean(total_ce).item()
+        
+        if args.vis_all:
+            save_dir = os.path.join(args.save_dir, 'vis')
+            if not os.path.exists(save_dir):
+                os.mkdir(save_dir)
+            if not args.two_stages:
+                save_overlap_bbox_img(model.image_1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, ue_mask=ue_mask)
+            else:
+                four_point_org_single_ori = torch.zeros((1, 2, 2, 2))
+                four_point_org_single_ori[:, :, 0, 0] = torch.Tensor([0, 0])
+                four_point_org_single_ori[:, :, 0, 1] = torch.Tensor([args.database_size - 1, 0])
+                four_point_org_single_ori[:, :, 1, 0] = torch.Tensor([0, args.database_size - 1])
+                four_point_org_single_ori[:, :, 1, 1] = torch.Tensor([args.database_size - 1, args.database_size - 1])
+                four_point_bbox = model.flow_bbox.cpu().detach() + four_point_org_single_ori
+                alpha = args.database_size / args.resize_width
+                four_point_bbox = four_point_bbox.flatten(2).permute(0, 2, 1).contiguous() / alpha
+                save_overlap_bbox_img(model.image_1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox, ue_mask=ue_mask)
+
+    logging.info(f"MACE Metric: {final_mace}")
+    logging.info(f'CE Metric: {final_ce}')
+    logging.info(f'Failure rate:{final_ue_mask}')
+    print(f"MACE Metric: {final_mace}")
+    print(f'CE Metric: {final_ce}')
+    print(f'Success rate:{final_ue_mask}')
+    if wandb_log:
+        wandb.log({"test_mace": final_mace})
+        wandb.log({"test_ce": final_ce})
+        wandb.log({"success_rate": final_ue_mask})
     logging.info(np.mean(np.array(timeall[1:-1])))
     io.savemat(args.save_dir + '/resmat', {'matrix': total_mace.numpy()})
     np.save(args.save_dir + '/resnpy.npy', total_mace.numpy())
-    io.savemat(args.save_dir + '/flowmat', {'matrix': total_flow.numpy()})
-    np.save(args.save_dir + '/flownpy.npy', total_flow.numpy())
     plot_hist_helper(args.save_dir)
 
 if __name__ == '__main__':
@@ -247,7 +175,7 @@ if __name__ == '__main__':
         args.save_dir = join(
         "test",
         args.save_dir,
-        args.eval_model.split("/")[-2] if args.eval_model is not None else args.eval_model_ue.split("/")[-2],
+        args.eval_model.split("/")[-2],
         f"{args.dataset_name}-{start_time.strftime('%Y-%m-%d_%H-%M-%S')}",
         )
         commons.setup_logging(args.save_dir, console='info')

@@ -143,7 +143,7 @@ def warp(x, flo):
     return output * mask
 
 
-def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None):
+def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_ue_gt=None):
     """ Loss function defined over sequence of flow predictions """
 
     flow_4cor = torch.zeros((four_preds[0].shape[0], 2, 2, 2)).to(four_preds[0].device)
@@ -165,6 +165,7 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None):
             i4cor_loss = (four_preds[i] - flow_4cor).abs()
             ce_loss += i_weight * (i4cor_loss).mean()
 
+    ce_loss = args.G_loss_lambda * ce_loss
     mace = torch.sum((four_preds[-1] - flow_4cor) ** 2, dim=1).sqrt()
     metrics['1px'] = (mace < 1).float().mean().item()
     metrics['3px'] = (mace < 3).float().mean().item()
@@ -183,7 +184,7 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None):
     return ce_loss, metrics
 
 
-def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None):
+def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_ue_gt=None):
     """ Loss function defined over sequence of flow predictions """
 
     flow_4cor = torch.zeros((four_preds[0].shape[0], 2, 2, 2)).to(four_preds[0].device)

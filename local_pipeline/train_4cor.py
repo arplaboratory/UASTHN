@@ -25,33 +25,17 @@ from myevaluate import evaluate_SNet
 def main(args):
     model = UAGL(args, for_training=True)
     model.setup()
-    if args.train_ue_method in ['train_only_ue', 'train_only_ue_raw_input']:
-        model.netG.eval()
-        for param in model.netG.parameters():
-            param.requires_grad = False
-        if args.two_stages:
-            model.netG_fine.eval()
-            for param in model.netG_fine.parameters():
-                param.requires_grad = False
+    if args.restore_ckpt is None or args.finetune:
+        model.netG.train()
     else:
-        if args.restore_ckpt is None or args.finetune:
-            model.netG.train()
-        else:
-            model.netG.eval()
-        if args.two_stages:
-            model.netG_fine.train()
+        model.netG.eval()
+    if args.two_stages:
+        model.netG_fine.train()
     logging.info(f"Parameter Count: {count_parameters(model.netG)}")
-    if args.use_ue and args.D_net != "ue_branch":
-        model.netD.train()
-        logging.info(f"Parameter Count: {count_parameters(model.netD)}")
 
     if args.restore_ckpt is not None:
-
         save_model = torch.load(args.restore_ckpt)
-        
         model.netG.load_state_dict(save_model['netG'])
-        if save_model['netD'] is not None:
-            model.netD.load_state_dict(save_model['netD'])
         if save_model['netG_fine'] is not None:
             model.netG_fine.load_state_dict(save_model['netG_fine'])
         
@@ -72,8 +56,6 @@ def main(args):
     test_dataset = datasets.fetch_dataloader(args, split='test')
     model_med = torch.load(args.save_dir + f'/{args.name}.pth')
     model.netG.load_state_dict(model_med['netG'])
-    if args.use_ue and args.D_net != "ue_branch":
-        model.netD.load_state_dict(model_med['netD'])
     if args.two_stages:
         model.netG_fine.load_state_dict(model_med['netG_fine'])
     evaluate_SNet(model, test_dataset, batch_size=args.batch_size, args=args, wandb_log=True)
@@ -94,7 +76,7 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
             save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
                              torchvision.utils.make_grid(model.real_warped_image_2, nrow=16, padding = 16, pad_value=0), 
                              args.save_dir + '/train_overlap_gt.png')
-        if i_batch==0 and args.train_ue_method != 'train_only_ue_raw_input':
+        if i_batch==0:
             save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
                             torchvision.utils.make_grid(model.fake_warped_image_2, nrow=16, padding = 16, pad_value=0),
                             args.save_dir + f'/train_overlap_pred.png')
@@ -102,19 +84,14 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
                 save_img(torchvision.utils.make_grid(model.image_1_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_crop.png')
                 save_img(torchvision.utils.make_grid(model.image_2_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_crop.png')
         model.update_learning_rate()
-        if args.train_ue_method != 'train_only_ue_raw_input':
-            metrics["lr"] = model.scheduler_G.get_lr()
-        else:
-            metrics["lr"] = model.scheduler_D.get_lr()
+        metrics["lr"] = model.scheduler_G.get_lr()
         toc = time.time()
         metrics['time'] = toc - tic
         wandb.log({
-                "mace": metrics["mace"] if args.train_ue_method == 'train_end_to_end' else 0,
+                "mace": metrics["mace"],
                 "lr": metrics["lr"][0],
-                "G_loss": metrics["G_loss"] if args.train_ue_method == 'train_end_to_end' else 0,
-                "GAN_loss": metrics["GAN_loss"] if args.train_ue_method == 'train_end_to_end' and args.use_ue else 0,
-                "D_loss": metrics["D_loss"] if args.use_ue and args.D_net != "ue_branch" else 0,
-                "ue_loss": metrics["ue_loss"] if args.use_ue and args.D_net == "ue_branch" else 0
+                "G_loss": metrics["G_loss"],
+                "ue_loss": metrics["ue_loss"] if args.ue_mock else 0
             },)
         total_steps += 1
         # Validate
@@ -125,23 +102,16 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
             PATH = args.save_dir + f'/{total_steps+1}_{args.name}.pth'
             checkpoint = {
                 "netG": model.netG.state_dict(),
-                "netD": model.netD.state_dict() if args.use_ue and args.D_net != "ue_branch" else None,
                 "netG_fine": model.netG_fine.state_dict() if args.two_stages else None,
             }
             torch.save(checkpoint, PATH)
-            if args.use_ue and args.train_ue_method in ['train_only_ue', 'train_only_ue_raw_input']:
-                if last_best_val_mace_conf_error is None or last_best_val_mace_conf_error > current_val_mace_conf_error:
-                    last_best_val_mace_conf_error = current_val_mace_conf_error
-                    PATH = args.save_dir + f'/{args.name}.pth'
-                    torch.save(checkpoint, PATH)
+            if last_best_val_mace is None or last_best_val_mace > current_val_mace:
+                logging.info(f"Saving best model, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
+                last_best_val_mace = current_val_mace
+                PATH = args.save_dir + f'/{args.name}.pth'
+                torch.save(checkpoint, PATH)
             else:
-                if last_best_val_mace is None or last_best_val_mace > current_val_mace:
-                    logging.info(f"Saving best model, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
-                    last_best_val_mace = current_val_mace
-                    PATH = args.save_dir + f'/{args.name}.pth'
-                    torch.save(checkpoint, PATH)
-                else:
-                    logging.info(f"No Saving, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
+                logging.info(f"No Saving, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
 
         if total_steps >= args.num_steps:
             break

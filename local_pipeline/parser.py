@@ -19,7 +19,6 @@ def parse_arguments():
     parser.add_argument('--gamma', type=float, default=0.85, help='exponential weighting')
     parser.add_argument('--mixed_precision', default=False, action='store_true', help='use mixed precision')
     parser.add_argument('--eval_model', type=str, default=None)
-    parser.add_argument('--eval_model_ue', type=str, default=None)
     parser.add_argument('--resume', default=False, action='store_true', help='resume_training')
     parser.add_argument('--weight', action='store_true')
     parser.add_argument("--datasets_folder", type=str, default="datasets", help="Path with all datasets")
@@ -27,16 +26,9 @@ def parse_arguments():
     parser.add_argument("--prior_location_threshold", type=int, default=-1, help="The threshold of search region from prior knowledge for train and test. If -1, then no prior knowledge")
     parser.add_argument("--val_positive_dist_threshold", type=int, default=50, help="_")
     parser.add_argument("--G_contrast", type=str, default="none", choices=["none", "manual", "autocontrast", "equalize"], help="G_contrast")
-    parser.add_argument("--use_ue", action="store_true", help="train uncertainty estimator with GAN")
     parser.add_argument("--G_loss_lambda", type=float, default=1.0, help="G_loss_lambda only for homo")
-    parser.add_argument("--D_net", type=str, default="patchGAN", choices=["none", "patchGAN", "patchGAN_deep", "ue_branch"], help="D_net")
-    parser.add_argument("--GAN_mode", type=str, default="macegan", choices=["vanilla", "lsgan", "macegan", "vanilla_rej"], help="Choices of GAN loss")
     parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"])
-    parser.add_argument("--train_ue_method", type=str, choices=['train_end_to_end', 'train_only_ue', 'train_only_ue_raw_input', 'finetune'], default='train_end_to_end', help="train uncertainty estimator")
-    parser.add_argument("--ue_alpha", type=float, default=-0.1, help="Alpha for ue")
     parser.add_argument("--permute", type=str, default="none", choices=["none", "img", "ue"])
-    parser.add_argument("--noise_std", type=float, default=10.0)
-    parser.add_argument("--sample_method", type=str, choices=['target', 'raw', 'target_raw'], default='raw', help="sample noise")
     parser.add_argument("--database_size", type=int, default=512, choices=[512, 1024, 1536, 2048, 2560], help="database_size")
     parser.add_argument("--test", action="store_true", help="test mode")
     parser.add_argument("--two_stages", action="store_true", help="crop at level 2 but same scale")
@@ -49,8 +41,6 @@ def parse_arguments():
     parser.add_argument("--identity", action="store_true")
     parser.add_argument("--finetune", action="store_true")
     parser.add_argument("--detach", action="store_true")
-    parser.add_argument("--rej_threshold", type=float, default=128.0)
-    parser.add_argument('--eval_model_fine', type=str, default=None, help="restore checkpoint")
     parser.add_argument('--augment_two_stages', type=float, default=0)
     parser.add_argument('--arch', type=str, default="IHN", choices=["IHN", "DHN", "LocalTrans"])
     parser.add_argument('--rotate_max', type=float, default=0)
@@ -65,10 +55,8 @@ def parse_arguments():
     parser.add_argument('--ue_agg', type=str, choices=["mean", "zero", "maj_vote"], default="mean")
     parser.add_argument('--ue_rej_std', type=float, default=32.0)
     parser.add_argument('--ue_maj_vote_rej', type=float, default=32.0)
+    parser.add_argument('--ue_mock', action="store_true")
     args = parser.parse_args()
     args.save_dir = "local_he"
     args.augment_type = "center"
-    if args.use_ue:
-        ratio = args.rej_threshold / 512.0
-        args.bce_weight = (1- ratio)/ratio
     return args
