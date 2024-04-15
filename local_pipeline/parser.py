@@ -46,7 +46,6 @@ def parse_arguments():
     parser.add_argument('--resize_max', type=float, default=0)
     parser.add_argument('--permute_max', type=float, default=0)
     parser.add_argument('--first_stage_ue', action="store_true")
-    parser.add_argument('--second_stage_ue', action="store_true")
     parser.add_argument('--ue_shift', type=int, default=64)
     parser.add_argument('--ue_num_crops', type=int, default=5, choices=[5, 10])
     parser.add_argument('--ue_shift_crops_types', type=str, default="grid", choices=["grid", "random"])
