@@ -83,6 +83,20 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
                 save_img(torchvision.utils.make_grid(model.image_1_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_crop.png')
                 save_img(torchvision.utils.make_grid(model.image_2_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_crop.png')
         model.update_learning_rate()
+        if torch.isnan(model.loss_G):
+            weights = model.optimizer_G.param_groups[0]['params']
+            weights_flat = [torch.flatten(weight) for weight in weights]
+            weights_1d = torch.cat(weights_flat)
+            assert not torch.isnan(weights_1d).any()
+            assert not torch.isinf(weights_1d).any()
+            print(f"{weights_1d.max()}, {weights_1d.min()}")
+
+            grad_flat = [torch.flatten(weight.grad) for weight in weights]
+            grad_1d = torch.cat(grad_flat)
+            assert not torch.isnan(grad_1d).any()
+            assert not torch.isinf(grad_1d).any()
+            print(f"{grad_1d.max()}, {grad_1d.min()}")
+            raise KeyError("Detect NaN for loss")
         metrics["lr"] = model.scheduler_G.get_lr()
         toc = time.time()
         metrics['time'] = toc - tic
