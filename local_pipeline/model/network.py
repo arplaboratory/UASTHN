@@ -52,6 +52,8 @@ class IHN(nn.Module):
         points = torch.cat((gridx.flatten().unsqueeze(0), gridy.flatten().unsqueeze(0), torch.ones((1, self.args.resize_width//4 * self.args.resize_width//4))),
                            dim=0).unsqueeze(0).repeat(H.shape[0], 1, 1).to(four_point.device)
         points_new = H.bmm(points)
+        if torch.isnan(points_new).any():
+            raise KeyError("Some of transformed coords are NaN!")
         points_new = points_new / points_new[:, 2, :].unsqueeze(1)
         points_new = points_new[:, 0:2, :]
         flow = torch.cat((points_new[:, 0, :].reshape(self.sz[0], self.sz[3], self.sz[2]).unsqueeze(1),
@@ -130,8 +132,6 @@ class IHN(nn.Module):
         self.sz = sz
         four_point_disp = torch.zeros((sz[0], 2, 2, 2)).to(fmap1.device)
         four_point_predictions = []
-        if self.first_stage and self.args.ue_mock:
-            four_point_ue = []
         # time1 = time.time()
         for itr in range(iters_lev0):
             corr = corr_fn(coords1)
@@ -143,18 +143,21 @@ class IHN(nn.Module):
                 else:
                     delta_four_point = self.update_block_4(corr, flow)
                     
-            four_point_disp =  four_point_disp + delta_four_point[:, :2]
-            if self.first_stage and self.args.ue_mock:
-                four_point_ue.append(delta_four_point[:, 2:])
-            four_point_predictions.append(four_point_disp)
-            coords1 = self.get_flow_now_4(four_point_disp)
+            try:
+                last_four_point_disp = four_point_disp
+                four_point_disp =  four_point_disp + delta_four_point[:, :2]
+                coords1 = self.get_flow_now_4(four_point_disp) # Possible error: Unsolvable H
+                four_point_predictions.append(four_point_disp)
+            except Exception as e:
+                logging.debug(e)
+                logging.debug("Ignore this delta. Use last disp.")
+                four_point_disp = last_four_point_disp
+                coords1 = self.get_flow_now_4(four_point_disp) # Possible error: Unsolvable H
+                four_point_predictions.append(four_point_disp)
         # time2 = time.time()
         # print("Time for iterative: " + str(time2 - time1) + " seconds") # 0.12
 
-        if self.first_stage and self.args.ue_mock:
-            return four_point_predictions, four_point_disp, four_point_ue
-        else:
-            return four_point_predictions, four_point_disp
+        return four_point_predictions, four_point_disp
 
 arch_list = {"IHN": IHN,
              "DHN": DHN,
@@ -230,10 +233,10 @@ class UAGL():
         # time1 = time.time()
         if self.args.first_stage_ue:
             self.first_stage_ue_generate()
+        self.four_preds_list, self.four_pred = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
         if self.args.ue_mock:
-            self.four_preds_list, self.four_pred, self.four_ue = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
-        else:
-            self.four_preds_list, self.four_pred = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
+            # self.four_pred_ue = None
+            raise NotImplementedError()
         if self.args.first_stage_ue:
             # for i in range(len(self.four_preds_list)): # DEBUG
             #     self.four_preds_list[i] = self.flow_4cor # DEBUG
@@ -261,6 +264,8 @@ class UAGL():
             # logging.debug("Time for 2nd forward pass: " + str(time2 - time1) + " seconds")
             # self.four_pred_fine = torch.zeros_like(self.four_pred).to(self.four_pred.device) # DEBUG
             # self.four_preds_list_fine[-1] = self.four_pred_fine # DEBUG
+            self.four_preds_list_first_stage = self.four_preds_list
+            self.four_pred_first_stage = self.four_pred
             self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox, for_training)
         self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
 

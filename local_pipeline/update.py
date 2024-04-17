@@ -319,7 +319,7 @@ class GMA(nn.Module):
                     init_dim = 488
                 else:
                     raise NotImplementedError()
-                self.cnn = CNN_64(128, init_dim=init_dim, ue_branch=(first_stage and args.ue_mock))
+                self.cnn = CNN_64(128, init_dim=init_dim)
         
         if sz==128:
             if self.args.weight:
