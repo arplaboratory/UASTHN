@@ -349,11 +349,20 @@ class UAGL():
         x_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
         y_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
         if self.args.ue_shift_crops_types == "grid":
-            x_shift_grid = np.linspace(0, resized_ue_shift, int(np.sqrt(self.args.ue_num_crops - 1)))
-            y_shift_grid = np.linspace(0, resized_ue_shift, int(np.sqrt(self.args.ue_num_crops - 1)))
+            if self.args.ue_num_crops == 2:
+                x_shift_grid = np.array(resized_ue_shift / 2) # 1 -> 1 2-4 -> 4 5-9 -> 9    
+                y_shift_grid = np.array(resized_ue_shift / 2)
+            elif self.args.ue_num_crops > 2 and self.args.ue_num_crops <= 5:
+                x_shift_grid = np.linspace(0, resized_ue_shift, 2) # 1 -> 1 2-4 -> 4 5-9 -> 9    
+                y_shift_grid = np.linspace(0, resized_ue_shift, 2)
+            elif self.args.ue_num_crops > 5 and self.args.ue_num_crops <= 10:
+                x_shift_grid = np.linspace(0, resized_ue_shift, 3) # 1 -> 1 2-4 -> 4 5-9 -> 9    
+                y_shift_grid = np.linspace(0, resized_ue_shift, 3)
+            else:
+                raise NotImplementedError()
             x_shift_grid, y_shift_grid = np.meshgrid(x_shift_grid, y_shift_grid)
-            x_shift_grid = list(x_shift_grid.reshape(-1))
-            y_shift_grid = list(y_shift_grid.reshape(-1))
+            x_shift_grid = list(x_shift_grid.reshape(-1))[:self.args.ue_num_crops-1]
+            y_shift_grid = list(y_shift_grid.reshape(-1))[:self.args.ue_num_crops-1]
             w_grid = [self.args.resize_width - resized_ue_shift for i in range(len(x_shift_grid))]
             x_shift = torch.tensor([0] + x_shift_grid).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
             y_shift = torch.tensor([0] + y_shift_grid).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)

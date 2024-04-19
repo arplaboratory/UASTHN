@@ -47,7 +47,7 @@ def parse_arguments():
     parser.add_argument('--permute_max', type=float, default=0)
     parser.add_argument('--first_stage_ue', action="store_true")
     parser.add_argument('--ue_shift', type=int, default=64)
-    parser.add_argument('--ue_num_crops', type=int, default=5, choices=[5, 10])
+    parser.add_argument('--ue_num_crops', type=int, default=5)
     parser.add_argument('--ue_shift_crops_types', type=str, default="grid", choices=["grid", "random"])
     parser.add_argument('--ue_mask_prob', type=float, default=0.5)
     parser.add_argument('--ue_mask_patchsize', type=int, default=16)
@@ -60,4 +60,8 @@ def parse_arguments():
     args = parser.parse_args()
     args.save_dir = "local_he"
     args.augment_type = "center"
+    if args.finetune and not args.two_stages:
+        raise KeyError("Finetune must work with two stages")
+    if args.ue_num_crops > 10 or args.ue_num_crops < 1:
+        raise NotImplementedError("Not implemented for ue_num_crops > 10 or < 1")
     return args
