@@ -62,6 +62,6 @@ def parse_arguments():
     args.augment_type = "center"
     if args.finetune and not args.two_stages:
         raise KeyError("Finetune must work with two stages")
-    if args.ue_num_crops > 10 or args.ue_num_crops < 1:
+    if args.ue_num_crops > 10 or args.ue_num_crops < 2:
         raise NotImplementedError("Not implemented for ue_num_crops > 10 or < 1")
     return args
