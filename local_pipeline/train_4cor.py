@@ -25,10 +25,7 @@ from myevaluate import evaluate_SNet
 def main(args):
     model = UAGL(args, for_training=True)
     model.setup()
-    if args.restore_ckpt is None or args.finetune:
-        model.netG.train()
-    else:
-        model.netG.eval()
+    model.netG.train()
     if args.two_stages:
         model.netG_fine.train()
     logging.info(f"Parameter Count: {count_parameters(model.netG)}")

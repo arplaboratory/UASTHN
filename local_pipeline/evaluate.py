@@ -58,10 +58,7 @@ def validate_process(model, args, total_steps):
         four_pr = model.four_pred
         mace = torch.sum((four_pr.cpu().detach() - flow_4cor) ** 2, dim=1).sqrt()
         mace_list.append(mace.view(-1).numpy())
-    if args.restore_ckpt is None or args.finetune:
-        model.netG.train()
-    else:
-        model.netG.eval()
+    model.netG.train()
     if args.two_stages:
         model.netG_fine.train()
     mace = np.mean(np.concatenate(mace_list))
