@@ -361,8 +361,10 @@ class UAGL():
             else:
                 raise NotImplementedError()
             x_shift_grid, y_shift_grid = np.meshgrid(x_shift_grid, y_shift_grid)
-            x_shift_grid = random.shuffle(list(x_shift_grid.reshape(-1)))[:self.args.ue_num_crops-1]
-            y_shift_grid = random.shuffle(list(y_shift_grid.reshape(-1)))[:self.args.ue_num_crops-1]
+            random.shuffle(list(x_shift_grid.reshape(-1)))
+            random.shuffle(list(y_shift_grid.reshape(-1)))
+            x_shift_grid = x_shift_grid[:self.args.ue_num_crops-1]
+            y_shift_grid = y_shift_grid[:self.args.ue_num_crops-1]
             w_grid = [self.args.resize_width - resized_ue_shift for i in range(len(x_shift_grid))]
             x_shift = torch.tensor([0] + x_shift_grid).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
             y_shift = torch.tensor([0] + y_shift_grid).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
