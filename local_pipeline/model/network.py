@@ -189,6 +189,8 @@ class UAGL():
             if args.restore_ckpt is not None and not args.finetune:
                 self.set_requires_grad(self.netG, False)
         self.criterionAUX = sequence_loss if self.args.arch == "IHN" else single_loss
+        if self.args.first_stage_ue:
+            self.ue_rng = np.random.default_rng(seed=args.ue_seed)
         if for_training:
             if args.two_stages:
                 if args.restore_ckpt is None or args.finetune:
@@ -364,7 +366,7 @@ class UAGL():
             x_shift_grid = x_shift_grid.reshape(-1)
             y_shift_grid = y_shift_grid.reshape(-1)
             idx = list(range(len(x_shift_grid)))
-            random.shuffle(idx)
+            self.ue_rng.shuffle(idx)
             idx = idx[:self.args.ue_num_crops-1]
             x_shift_grid_list = list(x_shift_grid[idx])
             y_shift_grid_list = list(y_shift_grid[idx])
@@ -373,8 +375,8 @@ class UAGL():
             y_shift = torch.tensor([0] + y_shift_grid_list).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
             w = torch.tensor([self.args.resize_width] + w_grid).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
         elif self.args.ue_shift_crops_types == "random":
-            x_shift_random = [random.randint(0, resized_ue_shift) for i in range(self.args.ue_num_crops - 1)]
-            y_shift_random = [random.randint(0, resized_ue_shift) for i in range(self.args.ue_num_crops - 1)]
+            x_shift_random = [int(self.ue_rng.integers(0, resized_ue_shift)) for i in range(self.args.ue_num_crops - 1)]
+            y_shift_random = [int(self.ue_rng.integers(0, resized_ue_shift)) for i in range(self.args.ue_num_crops - 1)]
             w_random = [self.args.resize_width - resized_ue_shift for i in range(self.args.ue_num_crops - 1)]
             x_shift = torch.tensor([0] + x_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
             y_shift = torch.tensor([0] + y_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
