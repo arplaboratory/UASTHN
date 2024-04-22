@@ -57,6 +57,7 @@ def parse_arguments():
     parser.add_argument('--ue_maj_vote_rej', type=float, default=32.0)
     parser.add_argument('--ue_mock', action="store_true")
     parser.add_argument("--ue_mock_loss_lambda", type=float, default=1.0, help="G_loss_lambda only for homo")
+    parser.add_argument("--ue_seed", type=int, default=0)
     args = parser.parse_args()
     args.save_dir = "local_he"
     args.augment_type = "center"
