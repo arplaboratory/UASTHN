@@ -335,7 +335,7 @@ class UAGL():
             self.image_2 = tgm.crop_and_resize(self.image_2, bbox_s, (self.args.resize_width, self.args.resize_width))
         elif self.args.ue_aug_method == "mask":
             self.image_2 = self.image_2.view(B, self.args.ue_num_crops, C, H, W)
-            mask = torch.from_numpy(self.ue_rng.rand((self.image_2.shape[0], int(self.args.ue_num_crops - 1), 1, self.image_2.shape[3]//self.args.ue_mask_patchsize, self.image_2.shape[4]//self.args.ue_mask_patchsize))).to(self.image_2.device) > self.args.ue_mask_prob
+            mask = torch.from_numpy(self.ue_rng.random((self.image_2.shape[0], int(self.args.ue_num_crops - 1), 1, self.image_2.shape[3]//self.args.ue_mask_patchsize, self.image_2.shape[4]//self.args.ue_mask_patchsize))).to(self.image_2.device) > self.args.ue_mask_prob
             mask = torch.repeat_interleave(torch.repeat_interleave(mask, self.args.ue_mask_patchsize, dim=3), self.args.ue_mask_patchsize, dim=4)
             self.image_2[:, 1:] = self.image_2[:, 1:] * mask
             self.image_2 = self.image_2.view(B*self.args.ue_num_crops, C, H, W)            
