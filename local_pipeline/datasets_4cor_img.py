@@ -249,11 +249,12 @@ class homo_dataset(data.Dataset):
         return img2, img1, flow, H, query_utm, database_utm
 
 class MYDATA(homo_dataset):
-    def __init__(self, args, datasets_folder="datasets", dataset_name="pitts30k", split="train", exclude_val_region=False):
+    def __init__(self, args, datasets_folder="datasets", dataset_name="pitts30k", split="train"):
         super(MYDATA, self).__init__(args, permute= (args.permute == "img"))
         self.args = args
         self.dataset_name = dataset_name
         self.split = split
+        exclude_val_region = args.exclude_val_region
         # Redirect datafolder path to h5
         # self.database_folder_h5_path = join(
         #     datasets_folder, dataset_name, split + "_database.h5"
