@@ -60,7 +60,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     total_mace = torch.empty(0)
     total_flow = torch.empty(0)
     total_ce = torch.empty(0)
-    total_ue_mask = torch.empty(0)
+    total_ue_mask = torch.empty(0, len(args.ue_rej_std))
     timeall=[]
     mace_conf_list = []
     for i_batch, data_blob in enumerate(tqdm(val_dataset)):
@@ -97,20 +97,22 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         if args.first_stage_ue:
             ue_std = model.std_four_pred_five_crops.view(model.std_four_pred_five_crops.shape[0], -1)
             beta = 512 / args.resize_width
-            if args.ue_std_method == "any":
-                ue_mask_rej = torch.any(ue_std > args.ue_rej_std / beta, dim=1).cpu()
-            elif args.ue_std_method == "all":
-                ue_mask_rej = torch.all(ue_std > args.ue_rej_std / beta, dim=1).cpu()
-            elif args.ue_std_method == "mean":
-                ue_mask_rej = (torch.mean(ue_std, dim=1) > args.ue_rej_std / beta).cpu()
-            else:
-                raise NotImplementedError()
-            ue_mask = ~ue_mask_rej
+            ue_mask_list = []
+            for j in range(len(args.ue_rej_std)):
+                if args.ue_std_method == "any":
+                    ue_mask_rej = torch.any(ue_std > args.ue_rej_std[j] / beta, dim=1).cpu()
+                elif args.ue_std_method == "all":
+                    ue_mask_rej = torch.all(ue_std > args.ue_rej_std[j] / beta, dim=1).cpu()
+                elif args.ue_std_method == "mean":
+                    ue_mask_rej = (torch.mean(ue_std, dim=1) > args.ue_rej_std[j] / beta).cpu()
+                else:
+                    raise NotImplementedError()
+                ue_mask = ~ue_mask_rej
+                ue_mask_list.append(ue_mask)
+            ue_mask = torch.stack(ue_mask_list, dim=1)
         total_ue_mask = torch.cat([total_ue_mask, ue_mask], dim=0)
-        final_ue_mask = torch.count_nonzero(total_ue_mask)/len(total_ue_mask)
-
-        total_mace = torch.cat([total_mace,mace_vec*ue_mask], dim=0)
-        final_mace = torch.mean(total_mace).item()
+        
+        total_mace = torch.cat([total_mace,mace_vec], dim=0)
         
         # CE
         four_point_org_single = torch.zeros((1, 2, 2, 2))
@@ -138,8 +140,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         ce_ = (center_pred_offset - center_gt_offset)**2
         ce_ = ((ce_[:,0] + ce_[:,1])**0.5)
         ce_vec = ce_
-        total_ce = torch.cat([total_ce, ce_vec*ue_mask], dim=0)
-        final_ce = torch.mean(total_ce).item()
+        total_ce = torch.cat([total_ce, ce_vec], dim=0)
         
         if args.vis_all:
             save_dir = os.path.join(args.save_dir, 'vis')
@@ -158,16 +159,21 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
                 four_point_bbox = four_point_bbox.flatten(2).permute(0, 2, 1).contiguous() / alpha
                 save_overlap_bbox_img(model.image_1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox, ue_mask=ue_mask)
 
-    logging.info(f"MACE Metric: {final_mace}")
-    logging.info(f'CE Metric: {final_ce}')
-    logging.info(f'Success rate:{final_ue_mask}')
-    print(f"MACE Metric: {final_mace}")
-    print(f'CE Metric: {final_ce}')
-    print(f'Success rate:{final_ue_mask}')
-    if wandb_log:
-        wandb.log({"test_mace": final_mace})
-        wandb.log({"test_ce": final_ce})
-        wandb.log({"success_rate": final_ue_mask})
+    for j in range(total_ue_mask.shape[1]):
+        ue_mask_single = total_ue_mask[:,j]
+        final_ue_mask = torch.count_nonzero(ue_mask_single)/len(ue_mask_single)
+        final_mace = torch.mean(total_mace * ue_mask_single).item()
+        final_ce = torch.mean(total_ce * ue_mask_single).item()
+        logging.info(f"MACE Metric {j}: {final_mace}")
+        logging.info(f'CE Metric {j}: {final_ce}')
+        logging.info(f'Success rate {j}:{final_ue_mask}')
+        print(f"MACE Metric {j}: {final_mace}")
+        print(f'CE Metric {j}: {final_ce}')
+        print(f'Success rate {j}:{final_ue_mask}')
+        if wandb_log:
+            wandb.log({f"test_mace_{j}": final_mace})
+            wandb.log({f"test_ce_{j}": final_ce})
+            wandb.log({f"success_rate_{j}": final_ue_mask})
     logging.info(np.mean(np.array(timeall[1:-1])))
     io.savemat(args.save_dir + '/resmat', {'matrix': total_mace.numpy()})
     np.save(args.save_dir + '/resnpy.npy', total_mace.numpy())
