@@ -27,7 +27,7 @@ def validate_process(model, args, total_steps):
     val_loader = datasets.fetch_dataloader(args, split='val')
     for i_batch, data_blob in enumerate(tqdm(val_loader)):
             
-        image1, image2, flow_gt,  H, query_utm, database_utm  = [x for x in data_blob]
+        image1, image2, flow_gt,  H, query_utm, database_utm, _, _  = [x for x in data_blob]
         
         if i_batch == 0:
             logging.info("Check the reproducibility by UTM:")

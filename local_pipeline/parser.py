@@ -60,6 +60,7 @@ def parse_arguments():
     parser.add_argument("--ue_mock_loss_lambda", type=float, default=1.0, help="G_loss_lambda only for homo")
     parser.add_argument("--ue_seed", type=int, default=0)
     parser.add_argument("--ue_std_method", type=str, default="any", choices=["any", "all", "mean"])
+    parser.add_argument("--generate_test_pairs", action='store_true')
     args = parser.parse_args()
     args.save_dir = "local_he"
     args.augment_type = "center"

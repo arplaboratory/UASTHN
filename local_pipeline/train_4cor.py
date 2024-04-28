@@ -60,7 +60,7 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
     count = 0
     for i_batch, data_blob in enumerate(tqdm(train_loader)):
         tic = time.time()
-        image1, image2, flow, _, query_utm, database_utm  = [x for x in data_blob]
+        image1, image2, flow, _, query_utm, database_utm, _, _  = [x for x in data_blob]
         model.set_input(image1, image2, flow)
         metrics = model.optimize_parameters()
         if i_batch==0:

@@ -63,8 +63,13 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     total_ue_mask = torch.empty(0, len(args.ue_rej_std))
     timeall=[]
     mace_conf_list = []
+    if args.generate_test_pairs:
+        test_pairs = torch.zeros(len(val_dataset.dataset), dtype=torch.long)
+
     for i_batch, data_blob in enumerate(tqdm(val_dataset)):
-        img1, img2, flow_gt,  H, query_utm, database_utm  = [x for x in data_blob]
+        img1, img2, flow_gt,  H, query_utm, database_utm, index, pos_index  = [x for x in data_blob]
+        if args.generate_test_pairs:
+            test_pairs[index] = pos_index
 
         if i_batch == 0:
             logging.info("Check the reproducibility by UTM:")
@@ -73,11 +78,11 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
 
         if not args.identity:
             model.set_input(img1, img2, flow_gt)
-            flow_4cor = torch.zeros((flow_gt.shape[0], 2, 2, 2))
-            flow_4cor[:, :, 0, 0] = flow_gt[:, :, 0, 0]
-            flow_4cor[:, :, 0, 1] = flow_gt[:, :, 0, -1]
-            flow_4cor[:, :, 1, 0] = flow_gt[:, :, -1, 0]
-            flow_4cor[:, :, 1, 1] = flow_gt[:, :, -1, -1]
+        flow_4cor = torch.zeros((flow_gt.shape[0], 2, 2, 2))
+        flow_4cor[:, :, 0, 0] = flow_gt[:, :, 0, 0]
+        flow_4cor[:, :, 0, 1] = flow_gt[:, :, 0, -1]
+        flow_4cor[:, :, 1, 0] = flow_gt[:, :, -1, 0]
+        flow_4cor[:, :, 1, 1] = flow_gt[:, :, -1, -1]
 
         if not args.identity:
             # time_start = time.time()
@@ -179,13 +184,19 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     np.save(args.save_dir + '/resnpy.npy', total_mace.numpy())
     plot_hist_helper(args.save_dir)
     if args.generate_test_pairs:
-        val_dataset.save_test_pairs()
+        torch.save(test_pairs, f"cache/{val_dataset.dataset.split}_{args.val_positive_dist_threshold}_pairs.pth")
 
 if __name__ == '__main__':
     args = parser.parse_arguments()
     start_time = datetime.now()
     if args.identity:
-        pass
+        args.save_dir = join(
+        "test",
+        args.save_dir,
+        "identity",
+        f"{args.dataset_name}-{start_time.strftime('%Y-%m-%d_%H-%M-%S')}",
+        )
+        commons.setup_logging(args.save_dir, console='info')
     else:
         args.save_dir = join(
         "test",

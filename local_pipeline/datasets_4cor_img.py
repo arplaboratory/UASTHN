@@ -7,7 +7,7 @@ import kornia.geometry.transform as tgm
 
 import random
 from glob import glob
-import os.path as osp
+import os
 import cv2
 from os.path import join
 import h5py
@@ -110,7 +110,7 @@ class homo_dataset(data.Dataset):
         four_point_1_permute[0, 3, 1] -= offset * beta / alpha
         return four_point_org_permute, four_point_1_permute
 
-    def __getitem__(self, query_PIL_image, database_PIL_image, query_utm, database_utm):
+    def __getitem__(self, query_PIL_image, database_PIL_image, query_utm, database_utm, index, pos_index):
         if hasattr(self, "rng") and self.rng is None:
             worker_info = torch.utils.data.get_worker_info()
             self.rng = np.random.default_rng(seed=worker_info.id)
@@ -246,7 +246,7 @@ class homo_dataset(data.Dataset):
         pf_patch[:, :, 1] = diff_y_branch1
         flow = torch.from_numpy(pf_patch).permute(2, 0, 1).float()
         H = H.squeeze()
-        return img2, img1, flow, H, query_utm, database_utm
+        return img2, img1, flow, H, query_utm, database_utm, index, pos_index
 
 class MYDATA(homo_dataset):
     def __init__(self, args, datasets_folder="datasets", dataset_name="pitts30k", split="train"):
@@ -386,11 +386,8 @@ class MYDATA(homo_dataset):
             list(self.queries_paths)
         self.queries_num = len(self.queries_paths)
     
-        if args.generate_test_pairs:
-            logging.info("Generating cached test pairs")
-            self.test_pairs = torch.zeros(self.queries_num)
-        if not os.path.exist(f"cache/{self.split}_{args.val_positive_dist_threshold}_pairs.pth"):
-            logging.info("Using online generated test pair. It is possible that different batch size can generate different test pairs.")
+        if not os.path.isfile(f"cache/{self.split}_{args.val_positive_dist_threshold}_pairs.pth"):
+            logging.info("Using online test pairs or generating test pairs. It is possible that different batch size can generate different test pairs.")
             self.test_pairs = None
         else:
             logging.info("Loading cached test pairs to make sure that the test pairs will not change for different batch size.")
@@ -431,15 +428,13 @@ class MYDATA(homo_dataset):
             pos_index = self.test_pairs[index]
         else:
             pos_index = random.choice(self.get_positive_indexes(index))
-            if self.args.generate_test_pairs:
-                self.test_pairs[index] = pos_index
         # pos_img = self._find_img_in_h5(pos_index, database_queries_split="database")
         pos_img = self._find_img_in_map(pos_index, database_queries_split="database")
         
         query_utm = torch.tensor(self.queries_utms[index]).unsqueeze(0)
         database_utm = torch.tensor(self.database_utms[pos_index]).unsqueeze(0)
     
-        return super(MYDATA, self).__getitem__(img, pos_img, query_utm, database_utm)
+        return super(MYDATA, self).__getitem__(img, pos_img, query_utm, database_utm, index, pos_index)
 
     def __repr__(self):
         return f"< {self.__class__.__name__}, {self.dataset_name} - #database: {self.database_num}; #queries: {self.queries_num} >"
@@ -487,8 +482,6 @@ class MYDATA(homo_dataset):
         img = F.crop(img=img, top=area[1], left=area[0], height=area[3]-area[1], width=area[2]-area[0])
         return img
 
-    def save_test_pairs(self):
-        torch.save(self.test_pairs, f"cache/{self.split}_{args.val_positive_dist_threshold}_pairs.pth")
 
 def fetch_dataloader(args, split='train'):
     train_dataset = MYDATA(args, args.datasets_folder, args.dataset_name, split)
