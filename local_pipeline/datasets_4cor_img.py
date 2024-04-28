@@ -386,6 +386,16 @@ class MYDATA(homo_dataset):
             list(self.queries_paths)
         self.queries_num = len(self.queries_paths)
     
+        if args.generate_test_pairs:
+            logging.info("Generating cached test pairs")
+            self.test_pairs = torch.zeros(self.queries_num)
+        if not os.path.exist(f"cache/{self.split}_{args.val_positive_dist_threshold}_pairs.pth"):
+            logging.info("Using online generated test pair. It is possible that different batch size can generate different test pairs.")
+            self.test_pairs = None
+        else:
+            logging.info("Loading cached test pairs to make sure that the test pairs will not change for different batch size.")
+            self.test_pairs = torch.load(f"cache/{self.split}_{args.val_positive_dist_threshold}_pairs.pth")
+
     def get_positive_indexes(self, query_index):
         positive_indexes = self.soft_positives_per_query[query_index]
         return positive_indexes
@@ -417,7 +427,12 @@ class MYDATA(homo_dataset):
             img = self._find_img_in_h5(index, database_queries_split="queries")
         
         # Positives
-        pos_index = random.choice(self.get_positive_indexes(index))
+        if self.test_pairs is not None and not self.args.generate_test_pairs:
+            pos_index = self.test_pairs[index]
+        else:
+            pos_index = random.choice(self.get_positive_indexes(index))
+            if self.args.generate_test_pairs:
+                self.test_pairs[index] = pos_index
         # pos_img = self._find_img_in_h5(pos_index, database_queries_split="database")
         pos_img = self._find_img_in_map(pos_index, database_queries_split="database")
         
@@ -471,6 +486,9 @@ class MYDATA(homo_dataset):
                 int(center_cood[1]) + self.args.database_size//2, int(center_cood[0]) + self.args.database_size//2)
         img = F.crop(img=img, top=area[1], left=area[0], height=area[3]-area[1], width=area[2]-area[0])
         return img
+
+    def save_test_pairs(self):
+        torch.save(self.test_pairs, f"cache/{self.split}_{args.val_positive_dist_threshold}_pairs.pth")
 
 def fetch_dataloader(args, split='train'):
     train_dataset = MYDATA(args, args.datasets_folder, args.dataset_name, split)

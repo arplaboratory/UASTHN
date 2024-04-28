@@ -93,7 +93,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         mace_ = ((mace_[:,0,:,:] + mace_[:,1,:,:])**0.5)
         mace_vec = torch.mean(torch.mean(mace_, dim=1), dim=1)
         # print(mace_[0,:])
-        ue_mask = torch.ones_like(mace_vec)
+        ue_mask = torch.ones((mace_vec.shape[0], len(args.ue_rej_std)))
         if args.first_stage_ue:
             ue_std = model.std_four_pred_five_crops.view(model.std_four_pred_five_crops.shape[0], -1)
             beta = 512 / args.resize_width
@@ -178,6 +178,8 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     io.savemat(args.save_dir + '/resmat', {'matrix': total_mace.numpy()})
     np.save(args.save_dir + '/resnpy.npy', total_mace.numpy())
     plot_hist_helper(args.save_dir)
+    if args.generate_test_pairs:
+        val_dataset.save_test_pairs()
 
 if __name__ == '__main__':
     args = parser.parse_arguments()
