@@ -101,15 +101,14 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         ue_mask = torch.ones((mace_vec.shape[0], len(args.ue_rej_std)))
         if args.first_stage_ue:
             ue_std = model.std_four_pred_five_crops.view(model.std_four_pred_five_crops.shape[0], -1)
-            beta = 512 / args.resize_width
             ue_mask_list = []
             for j in range(len(args.ue_rej_std)):
                 if args.ue_std_method == "any":
-                    ue_mask_rej = torch.any(ue_std > args.ue_rej_std[j] / beta, dim=1).cpu() # wrong, should be alpha not beta
+                    ue_mask_rej = torch.any(ue_std > args.ue_rej_std[j], dim=1).cpu()
                 elif args.ue_std_method == "all":
-                    ue_mask_rej = torch.all(ue_std > args.ue_rej_std[j] / beta, dim=1).cpu()
+                    ue_mask_rej = torch.all(ue_std > args.ue_rej_std[j], dim=1).cpu()
                 elif args.ue_std_method == "mean":
-                    ue_mask_rej = (torch.mean(ue_std, dim=1) > args.ue_rej_std[j] / beta).cpu()
+                    ue_mask_rej = (torch.mean(ue_std, dim=1) > args.ue_rej_std[j]).cpu()
                 else:
                     raise NotImplementedError()
                 ue_mask = ~ue_mask_rej
