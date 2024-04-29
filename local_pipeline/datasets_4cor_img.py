@@ -110,7 +110,7 @@ class homo_dataset(data.Dataset):
         four_point_1_permute[0, 3, 1] -= offset * beta / alpha
         return four_point_org_permute, four_point_1_permute
 
-    def __getitem__(self, query_PIL_image, database_PIL_image, query_utm, database_utm, index, pos_index):
+    def __getitem__(self, query_PIL_image, database_PIL_image, query_utm, database_utm, index, pos_index, neg_img2=None):
         if hasattr(self, "rng") and self.rng is None:
             worker_info = torch.utils.data.get_worker_info()
             self.rng = np.random.default_rng(seed=worker_info.id)
@@ -246,7 +246,10 @@ class homo_dataset(data.Dataset):
         pf_patch[:, :, 1] = diff_y_branch1
         flow = torch.from_numpy(pf_patch).permute(2, 0, 1).float()
         H = H.squeeze()
-        return img2, img1, flow, H, query_utm, database_utm, index, pos_index
+        if neg_img2 is None:
+            return img2, img1, flow, H, query_utm, database_utm, index, pos_index
+        else:
+            return img2, img1, flow, H, query_utm, database_utm, index, pos_index, neg_img2
 
 class MYDATA(homo_dataset):
     def __init__(self, args, datasets_folder="datasets", dataset_name="pitts30k", split="train"):
@@ -484,6 +487,78 @@ class MYDATA(homo_dataset):
         img = F.crop(img=img, top=area[1], left=area[0], height=area[3]-area[1], width=area[2]-area[0])
         return img
 
+class MYTRIPLETDATA(MYDATA):
+    def __init__(self, args, datasets_folder="datasets", dataset_name="pitts30k", split="train"):
+        super().__init__(args, datasets_folder, dataset_name, split)
+        self.mining = "random" # default to random
+        self.neg_dist_threshold = args.database_size // 2 + 512 // 2
+
+        # Find soft_negatives_per_query, which are within train_positives_dist_threshold (10 meters)
+        knn = NearestNeighbors(n_jobs=-1)
+        knn.fit(self.database_utms)
+        self.soft_negatives_per_query = list(
+            knn.radius_neighbors(
+                self.queries_utms,
+                radius=self.neg_dist_threshold,  # 10 meters
+                return_distance=False,
+            )
+        )
+
+    def recompute_negatives_random(self, args):
+        # This loop's iterations could be done individually in the __getitem__(). This way is slower but clearer (and yields same results)
+        self.negative_samples = []
+        for index in tqdm(self.queries_num, ncols=100):
+            # Choose some random database images, from those remove the soft_positives, and then take the first 10 images as neg_indexes
+            soft_negatives = self.soft_negatives_per_query[index]
+            neg_indexes = np.random.choice(
+                self.database_num,
+                size= 1 + len(soft_negatives),
+                replace=False,
+                )
+            neg_indexes = np.setdiff1d(neg_indexes, soft_positives, assume_unique=True)[0]
+            self.negative_samples.append(
+                neg_idnexes
+            )
+
+        # self.triplets_global_indexes is a tensor of shape [1000, 12]
+        self.negative_samples = torch.tensor(self.negative_samples)
+
+    def __getitem__(self, index):
+        # Init
+        if self.queries_folder_h5_df is None:
+            # self.database_folder_h5_df = h5py.File(
+            #     self.database_folder_h5_path, "r", swmr=True)
+            self.database_folder_nameh5_df = h5py.File(
+                self.database_folder_nameh5_path, "r", swmr=True)
+            self.queries_folder_h5_df = h5py.File(
+                self.queries_folder_h5_path, "r", swmr=True)
+            
+        # Queries
+        if self.args.G_contrast!="none" and self.split!="extended":
+            if self.args.G_contrast == "manual":
+                img = transforms.functional.adjust_contrast(self._find_img_in_h5(index, database_queries_split="queries"), contrast_factor=3)
+            elif self.args.G_contrast == "autocontrast":
+                img = transforms.functional.autocontrast(self._find_img_in_h5(index, database_queries_split="queries"))
+            elif self.args.G_contrast == "equalize":
+                img =  transforms.functional.equalize(self._find_img_in_h5(index, database_queries_split="queries"))
+            else:
+                raise NotImplementedError()
+        else:
+            img = self._find_img_in_h5(index, database_queries_split="queries")
+        
+        # Positives
+        if self.test_pairs is not None and not self.args.generate_test_pairs:
+            pos_index = self.test_pairs[index]
+        else:
+            pos_index = random.choice(self.get_positive_indexes(index))
+        # pos_img = self._find_img_in_h5(pos_index, database_queries_split="database")
+        pos_img = self._find_img_in_map(pos_index, database_queries_split="database")
+        neg_img = self._find_img_in_map(pos_index, database_queries_split="database")
+        
+        query_utm = torch.tensor(self.queries_utms[index]).unsqueeze(0)
+        database_utm = torch.tensor(self.database_utms[pos_index]).unsqueeze(0)
+    
+        return super().super().__getitem__(self, img, pos_img, query_utm, database_utm, index, pos_index, neg_img)
 
 def fetch_dataloader(args, split='train'):
     train_dataset = MYDATA(args, args.datasets_folder, args.dataset_name, split)

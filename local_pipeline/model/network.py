@@ -215,7 +215,7 @@ class UAGL():
             model = model.to(self.device)
         return model
     
-    def set_input(self, A, B, flow_gt=None, A_ori=None):
+    def set_input(self, A, B, flow_gt=None, A_ori=None, neg_A=None):
         self.image_1_ori = A.to(self.device, non_blocking=True)
         self.image_2 = B.to(self.device, non_blocking=True)
         self.flow_gt = flow_gt.to(self.device, non_blocking=True)

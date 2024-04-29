@@ -60,8 +60,8 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
     count = 0
     for i_batch, data_blob in enumerate(tqdm(train_loader)):
         tic = time.time()
-        image1, image2, flow, _, query_utm, database_utm, _, _  = [x for x in data_blob]
-        model.set_input(image1, image2, flow)
+        image1, image2, flow, _, query_utm, database_utm, _, _, neg_image1  = [x for x in data_blob]
+        model.set_input(image1, image2, flow, neg_image1 = neg_image1)
         metrics = model.optimize_parameters()
         if i_batch==0:
             save_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1.png')
