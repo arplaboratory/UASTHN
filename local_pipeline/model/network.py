@@ -404,7 +404,7 @@ class UAGL():
         four_pred_five_crops = four_pred.view(four_pred.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
         std_four_pred_five_crops = torch.std(four_pred_five_crops, dim=1)
         mean_four_pred_five_crops = torch.mean(four_pred_five_crops, dim=1)
-        resize_maj_vote_rej = self.args.ue_maj_vote_rej / alpha
+        resize_maj_vote_rej = self.args.ue_maj_vote_rej
         four_pred_agg_list = []
         for i in range(len(four_pred_five_crops)):
             if self.args.ue_agg == "mean":

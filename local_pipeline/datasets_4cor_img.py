@@ -388,9 +388,11 @@ class MYDATA(homo_dataset):
     
         if not os.path.isfile(f"cache/{self.split}_{args.val_positive_dist_threshold}_pairs.pth"):
             logging.info("Using online test pairs or generating test pairs. It is possible that different batch size can generate different test pairs.")
+            print("Using online test pairs or generating test pairs. It is possible that different batch size can generate different test pairs.")
             self.test_pairs = None
         else:
             logging.info("Loading cached test pairs to make sure that the test pairs will not change for different batch size.")
+            print("Loading cached test pairs to make sure that the test pairs will not change for different batch size.")
             self.test_pairs = torch.load(f"cache/{self.split}_{args.val_positive_dist_threshold}_pairs.pth")
 
     def get_positive_indexes(self, query_index):
