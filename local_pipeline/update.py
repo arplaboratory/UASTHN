@@ -206,9 +206,8 @@ class CNN_128(nn.Module):
 
 
 class CNN_64(nn.Module):
-    def __init__(self, input_dim=256, hidden_dim=256, init_dim=164, ue_branch=False):
+    def __init__(self, input_dim=256, hidden_dim=256, init_dim=164):
         super(CNN_64, self).__init__()
-        self.ue_branch = ue_branch
 
         outputdim = input_dim
         self.layer1 = nn.Sequential(nn.Conv2d(init_dim, outputdim, 3, padding=1, stride=1),
@@ -239,10 +238,6 @@ class CNN_64(nn.Module):
         outputdim_final = outputdim
         self.layer10 = nn.Sequential(nn.Conv2d(outputdim_final, outputdim_final, 3,  padding=1, stride=1), nn.GroupNorm(num_groups=(outputdim_final) // 8, num_channels=outputdim_final),
                                      nn.ReLU(), nn.Conv2d(outputdim_final, 2, 1))
-        
-        if self.ue_branch:
-            self.layer10_ue = nn.Sequential(nn.Conv2d(outputdim_final, outputdim_final, 3,  padding=1, stride=1), nn.GroupNorm(num_groups=(outputdim_final) // 8, num_channels=outputdim_final),
-                                        nn.ReLU(), nn.Conv2d(outputdim_final, 2, 1))
 
     def forward(self, x):
         x = self.layer1(x)
@@ -251,9 +246,6 @@ class CNN_64(nn.Module):
         x = self.layer4(x)
         x = self.layer5(x)
         x1 = self.layer10(x)
-        if self.ue_branch:
-            x2 = self.layer10_ue(x)
-            x1 = torch.cat([x1, x2], dim=1)
         return x1
 
 class CNN(nn.Module):
