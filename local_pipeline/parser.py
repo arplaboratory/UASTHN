@@ -53,7 +53,7 @@ def parse_arguments():
     parser.add_argument('--ue_mask_prob', type=float, default=0.5)
     parser.add_argument('--ue_mask_patchsize', type=int, default=16)
     parser.add_argument('--ue_aug_method', type=str, default="shift", choices=["shift", "mask"])
-    parser.add_argument('--ue_agg', type=str, choices=["mean", "zero", "maj_vote", "maj_vote_mean"], default="mean")
+    parser.add_argument('--ue_agg', type=str, choices=["mean", "zero", "maj_vote"], default="mean")
     parser.add_argument('--ue_rej_std', type=float, nargs='+', default=[2.0, 4.0, 8.0, 16.0])
     parser.add_argument('--ue_maj_vote_rej', type=float, default=16.0)
     parser.add_argument('--ue_mock', action="store_true")

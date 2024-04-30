@@ -419,14 +419,6 @@ class UAGL():
                         four_pred_agg+=four_pred_five_crops[i, j]
                         count+=1
                 four_pred_agg/=count
-            elif self.args.ue_agg == "maj_vote_mean":
-                four_pred_agg = four_pred_five_crops[i, 0].clone()
-                count = 1
-                for j in range(1,self.args.ue_num_crops):
-                    if torch.norm(mean_four_pred_five_crops[i] - four_pred_five_crops[i, j]) <= resize_maj_vote_rej:
-                        four_pred_agg+=four_pred_five_crops[i, j]
-                        count+=1
-                four_pred_agg/=count
             four_pred_agg_list.append(four_pred_agg)
         four_pred_new = torch.stack(four_pred_agg_list)
         four_preds_list_new = []
