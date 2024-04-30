@@ -61,6 +61,7 @@ def parse_arguments():
     parser.add_argument("--ue_seed", type=int, default=0)
     parser.add_argument("--ue_std_method", type=str, default="any", choices=["any", "all", "mean"])
     parser.add_argument("--generate_test_pairs", action='store_true')
+    parser.add_argument("--check_step", type=int, default=-1, choices=[-1,0,1,2,3,4,5])
     args = parser.parse_args()
     args.save_dir = "local_he"
     args.augment_type = "center"

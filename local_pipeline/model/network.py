@@ -342,7 +342,7 @@ class UAGL():
 
     def first_stage_ue_aggregation(self, four_preds_list, four_pred, for_training):
         alpha = self.args.database_size / self.args.resize_width
-        four_preds_list, four_pred, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, four_pred, alpha, for_training)
+        four_preds_list, four_pred, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
         return four_preds_list, four_pred
 
     def first_stage_ue_generate_bbox(self):
@@ -393,14 +393,14 @@ class UAGL():
         self.normed_shift_flow_bbox = shift_flow_bbox * beta / alpha
         return bbox_s
 
-    def ue_aggregation(self, four_preds_list, four_pred, alpha, for_training):
+    def ue_aggregation(self, four_preds_list, alpha, for_training, check_step=-1):
         if self.args.ue_aug_method == "shift":
             # Recover shift
             four_preds_recovered_list = []
             for i in range(len(four_preds_list)):
                 four_preds_recovered_list.append(four_preds_list[i] - self.normed_shift_flow_bbox)
             four_preds_list = four_preds_recovered_list
-            four_pred = four_preds_list[-1]
+        four_pred = four_preds_list[check_step]
         four_pred_five_crops = four_pred.view(four_pred.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
         std_four_pred_five_crops = torch.std(four_pred_five_crops, dim=1)
         mean_four_pred_five_crops = torch.mean(four_pred_five_crops, dim=1)
