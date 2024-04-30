@@ -561,22 +561,10 @@ class MYTRIPLETDATA(MYDATA):
         return super().super().__getitem__(self, img, pos_img, query_utm, database_utm, index, pos_index, neg_img)
 
 def fetch_dataloader(args, split='train'):
-    train_dataset = MYDATA(args, args.datasets_folder, args.dataset_name, split)
-    if split == 'train' or split == 'extended':
-        train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size,
-                                        pin_memory=True, shuffle=True, num_workers=args.num_workers,
-                                        drop_last=True, worker_init_fn=seed_worker)
-    elif split == 'val' or split == 'test':
-        g = torch.Generator()
-        g.manual_seed(0)
-        train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size,
-                                pin_memory=True, shuffle=False, num_workers=args.num_workers,
-                                drop_last=False, worker_init_fn=seed_worker, generator=g)
-    logging.info(f"{split} set: {train_dataset}")
-    return train_loader
-
-def fetch_dataloader_triplet(args, split='train'):
-    train_dataset = MYTRIPLETDATA(args, args.datasets_folder, args.dataset_name, split)
+    if not args.neg_training:
+        train_dataset = MYDATA(args, args.datasets_folder, args.dataset_name, split)
+    else:
+        train_dataset = MYTRIPLETDATA(args, args.datasets_folder, args.dataset_name, split)
     if split == 'train' or split == 'extended':
         train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size,
                                         pin_memory=True, shuffle=True, num_workers=args.num_workers,

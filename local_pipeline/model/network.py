@@ -290,7 +290,7 @@ class UAGL():
             # for i in range(len(self.four_preds_list)): # DEBUG
             #     self.four_preds_list[i] = self.flow_4cor # DEBUG
             # self.four_pred = self.flow_4cor # DEBUG
-            _, _ = self.first_stage_ue_aggregation(four_preds_list_neg, four_pred_neg, for_training, neg_training=True)
+            _, _ = self.first_stage_ue_aggregation(four_preds_list_neg, four_pred_neg, for_training, neg_forward=True)
             B5, C, H, W = self.image_2.shape
             self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
             self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
@@ -364,9 +364,9 @@ class UAGL():
             self.image_2[:, 1:] = self.image_2[:, 1:] * mask
             self.image_2 = self.image_2.view(B*self.args.ue_num_crops, C, H, W)            
 
-    def first_stage_ue_aggregation(self, four_preds_list, four_pred, for_training, neg_training=False):
+    def first_stage_ue_aggregation(self, four_preds_list, four_pred, for_training, neg_forward=False):
         alpha = self.args.database_size / self.args.resize_width
-        if not neg_training:
+        if not neg_forward:
             four_preds_list, four_pred, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
         else:
             four_preds_list, four_pred, self.std_four_pred_five_crops_neg = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
@@ -499,13 +499,14 @@ class UAGL():
 
     def optimize_parameters(self):
         self.forward(for_training=True) # Calculate Fake A
-        if self.image_1_neg is not None:
+        if self.args.neg_training:
             self.forward_neg(for_training=True)
         self.metrics = dict()
         # update G
         self.optimizer_G.zero_grad()        # set G's gradients to zero
         self.backward_G()                   # calculate graidents for G
-        self.backward_D()
+        if self.args.neg_training:
+            self.backward_D()
         if self.args.restore_ckpt is None or self.args.finetune:
             nn.utils.clip_grad_norm_(self.netG.parameters(), self.args.clip)
         if self.args.two_stages:
