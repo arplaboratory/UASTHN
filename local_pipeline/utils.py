@@ -201,6 +201,10 @@ def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_ue
 
     return ce_loss, metrics
 
+def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_ue_gt=None):
+    """ Loss function defined over sequence of flow predictions """
+    neg_loss = torch.mean(F.relu(args.neg_margin - four_ue_gt))
+    return neg_loss
 
 def fetch_optimizer(args, model_para):
     """ Create the optimizer and learning rate scheduler """

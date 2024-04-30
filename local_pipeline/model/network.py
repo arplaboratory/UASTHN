@@ -6,7 +6,7 @@ import kornia.geometry.bbox as bbox
 from update import GMA
 from extractor import BasicEncoderQuarter
 from corr import CorrBlock
-from utils import coords_grid, sequence_loss, single_loss, fetch_optimizer, warp
+from utils import coords_grid, sequence_loss, single_loss, sequence_neg_loss, single_neg_loss, fetch_optimizer, warp
 import os
 import sys
 from model.sync_batchnorm import convert_model
@@ -189,6 +189,7 @@ class UAGL():
             if args.restore_ckpt is not None and not args.finetune:
                 self.set_requires_grad(self.netG, False)
         self.criterionAUX = sequence_loss if self.args.arch == "IHN" else single_loss
+        self.criterionNEG = single_neg_loss
         if self.args.first_stage_ue:
             self.ue_rng = np.random.default_rng(seed=args.ue_seed)
         if for_training:
@@ -215,7 +216,7 @@ class UAGL():
             model = model.to(self.device)
         return model
     
-    def set_input(self, A, B, flow_gt=None, A_ori=None, neg_A=None):
+    def set_input(self, A, B, flow_gt=None, neg_A=None):
         self.image_1_ori = A.to(self.device, non_blocking=True)
         self.image_2 = B.to(self.device, non_blocking=True)
         self.flow_gt = flow_gt.to(self.device, non_blocking=True)
@@ -229,6 +230,11 @@ class UAGL():
         else:
             self.real_warped_image_2 = None
         self.image_1 = F.interpolate(self.image_1_ori, size=self.args.resize_width, mode='bilinear', align_corners=True, antialias=True)
+        if neg_A is not None:
+            self.image_1_neg_ori = neg_A.to(self.device, non_blocking=True)
+            self.image_1_neg = F.interpolate(self.image_1_neg_ori, size=self.args.resize_width, mode='bilinear', align_corners=True, antialias=True)
+        else:
+            self.image_1_neg = None
         
     def forward(self, for_training=False):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
@@ -270,6 +276,24 @@ class UAGL():
             self.four_pred_first_stage = self.four_pred
             self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox, for_training)
         self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
+
+    def forward_neg(self, for_training=False):
+        """Run forward pass; called by both functions <optimize_parameters> and <test>."""
+        # time1 = time.time()
+        if self.args.first_stage_ue:
+            self.first_stage_ue_generate()
+        four_preds_list_neg, four_pred_neg = self.netG(image1=self.image_1_neg, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
+        if self.args.ue_mock:
+            # self.four_pred_ue = None
+            raise NotImplementedError()
+        if self.args.first_stage_ue:
+            # for i in range(len(self.four_preds_list)): # DEBUG
+            #     self.four_preds_list[i] = self.flow_4cor # DEBUG
+            # self.four_pred = self.flow_4cor # DEBUG
+            _, _ = self.first_stage_ue_aggregation(four_preds_list_neg, four_pred_neg, for_training, neg_training=True)
+            B5, C, H, W = self.image_2.shape
+            self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
+            self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
 
     def get_cropped_st_images(self, image_1_ori, four_pred, fine_padding, detach=True, augment_two_stages=0):
         # From four_pred to bbox coordinates
@@ -340,9 +364,12 @@ class UAGL():
             self.image_2[:, 1:] = self.image_2[:, 1:] * mask
             self.image_2 = self.image_2.view(B*self.args.ue_num_crops, C, H, W)            
 
-    def first_stage_ue_aggregation(self, four_preds_list, four_pred, for_training):
+    def first_stage_ue_aggregation(self, four_preds_list, four_pred, for_training, neg_training=False):
         alpha = self.args.database_size / self.args.resize_width
-        four_preds_list, four_pred, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
+        if not neg_training:
+            four_preds_list, four_pred, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
+        else:
+            four_preds_list, four_pred, self.std_four_pred_five_crops_neg = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
         return four_preds_list, four_pred
 
     def first_stage_ue_generate_bbox(self):
@@ -446,6 +473,17 @@ class UAGL():
         self.metrics["G_loss"] = self.loss_G.cpu().item()
         self.loss_G.backward()
 
+    def backward_D(self):
+        """Calculate GAN and L1 loss for the generator"""
+        # Second, G(A) = B
+        if self.args.ue_mock:
+            self.loss_D = self.criterionNEG(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue=self.four_ue, four_ue_gt=self.std_four_pred_five_crops_neg) 
+        else:
+            self.loss_D = self.criterionNEG(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue_gt=self.std_four_pred_five_crops_neg) 
+        # combine loss and calculate gradients
+        self.metrics["D_loss"] = self.loss_D.cpu().item()
+        self.loss_D.backward()
+
     def set_requires_grad(self, nets, requires_grad=False):
         """Set requies_grad=Fasle for all the networks to avoid unnecessary computations
         Parameters:
@@ -461,10 +499,13 @@ class UAGL():
 
     def optimize_parameters(self):
         self.forward(for_training=True) # Calculate Fake A
+        if self.image_1_neg is not None:
+            self.forward_neg(for_training=True)
         self.metrics = dict()
         # update G
         self.optimizer_G.zero_grad()        # set G's gradients to zero
         self.backward_G()                   # calculate graidents for G
+        self.backward_D()
         if self.args.restore_ckpt is None or self.args.finetune:
             nn.utils.clip_grad_norm_(self.netG.parameters(), self.args.clip)
         if self.args.two_stages:
