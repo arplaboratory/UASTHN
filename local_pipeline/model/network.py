@@ -478,7 +478,7 @@ class UAGL():
         """Calculate GAN and L1 loss for the generator"""
         # Second, G(A) = B
         if self.args.ue_mock:
-            self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue=self.four_ue, four_ue_gt=self.std_four_pred_five_crops) 
+            self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue=self.four_pred_ue, four_ue_gt=self.std_four_pred_five_crops) 
         else:
             self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics) 
         # combine loss and calculate gradients
@@ -491,7 +491,7 @@ class UAGL():
         # Second, G(A) = B
         if self.args.ue_mock:
             raise NotImplementedError()
-            self.loss_D = self.criterionNEG(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue=self.four_ue, four_ue_gt=self.std_four_pred_five_crops_neg) 
+            self.loss_D = self.criterionNEG(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue=self.four_pred_ue_neg, four_ue_gt=self.std_four_pred_five_crops_neg) 
         else:
             self.loss_D = self.criterionNEG(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue_gt=self.std_four_pred_five_crops_neg) 
         # combine loss and calculate gradients
