@@ -6,7 +6,7 @@ import kornia.geometry.bbox as bbox
 from update import GMA
 from extractor import BasicEncoderQuarter
 from corr import CorrBlock
-from utils import coords_grid, sequence_loss, single_loss, sequence_neg_loss, single_neg_loss, fetch_optimizer, warp
+from utils import coords_grid, sequence_loss, single_loss, single_neg_loss, fetch_optimizer, warp
 import os
 import sys
 from model.sync_batchnorm import convert_model
