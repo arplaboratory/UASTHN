@@ -421,6 +421,14 @@ class UAGL():
             x_shift = torch.tensor([0] + x_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
             y_shift = torch.tensor([0] + y_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
             w = torch.tensor([self.args.resize_width] + w_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
+        elif self.args.ue_shift_crops_types == "random_relax":
+            resized_ue_shift_list = [int(self.ue_rng.integers(0, 2*resized_ue_shift)) for i in range(self.args.ue_num_crops - 1)]
+            x_shift_random = [int(self.ue_rng.integers(0, resized_ue_shift_list[i])) for i in range(self.args.ue_num_crops - 1)]
+            y_shift_random = [int(self.ue_rng.integers(0, resized_ue_shift_list[i])) for i in range(self.args.ue_num_crops - 1)]
+            w_random = [self.args.resize_width - resized_ue_shift_list[i] for i in range(self.args.ue_num_crops - 1)]
+            x_shift = torch.tensor([0] + x_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
+            y_shift = torch.tensor([0] + y_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
+            w = torch.tensor([self.args.resize_width] + w_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
         else:
             raise NotImplementedError()
         x_start += x_shift
@@ -464,14 +472,9 @@ class UAGL():
         four_preds_list_new = []
         for i in range(len(four_preds_list)):
             four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
-            if self.args.ue_agg == "mean":
-                mean_four_pred_single = torch.mean(four_pred_single, dim=1)
-                four_preds_list_new.append(mean_four_pred_single)
-            elif self.args.ue_agg == "zero":
-                four_preds_list_new.append(four_pred_single[:, 0])
-            elif self.args.ue_agg == "maj_vote": # mean for training
-                mean_four_pred_single = torch.mean(four_pred_single, dim=1)
-                four_preds_list_new.append(mean_four_pred_single)
+            # Mean for training
+            mean_four_pred_single = torch.mean(four_pred_single, dim=1)
+            four_preds_list_new.append(mean_four_pred_single)
         return four_preds_list_new, four_pred_new, std_four_pred_five_crops
 
     def backward_G(self):

@@ -507,7 +507,7 @@ class MYTRIPLETDATA(MYDATA):
     def recompute_negatives_random(self, args):
         # This loop's iterations could be done individually in the __getitem__(). This way is slower but clearer (and yields same results)
         self.negative_samples = []
-        for index in tqdm(self.queries_num, ncols=100):
+        for index in self.queries_num:
             # Choose some random database images, from those remove the soft_positives, and then take the first 10 images as neg_indexes
             soft_negatives = self.soft_negatives_per_query[index]
             neg_indexes = np.random.choice(
@@ -515,9 +515,9 @@ class MYTRIPLETDATA(MYDATA):
                 size= 1 + len(soft_negatives),
                 replace=False,
                 )
-            neg_indexes = np.setdiff1d(neg_indexes, soft_positives, assume_unique=True)[0]
+            neg_indexes = np.setdiff1d(neg_indexes, soft_negatives, assume_unique=True)[0]
             self.negative_samples.append(
-                neg_idnexes
+                neg_indexes
             )
 
         # self.triplets_global_indexes is a tensor of shape [1000, 12]

@@ -58,6 +58,8 @@ def main(args):
 
 def train(model, train_loader, args, total_steps, last_best_val_mace, train_step_limit = None):
     count = 0
+    if args.neg_training:
+        train_loader.dataset.recompute_negatives_random()
     for i_batch, data_blob in enumerate(tqdm(train_loader)):
         tic = time.time()
         if args.neg_training:
