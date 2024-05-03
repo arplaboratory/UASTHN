@@ -562,7 +562,7 @@ class MYTRIPLETDATA(MYDATA):
         return homo_dataset.__getitem__(self, img, pos_img, query_utm, database_utm, index, pos_index, neg_img)
 
 def fetch_dataloader(args, split='train'):
-    if not args.neg_training:
+    if not args.neg_training or (split == "val" or split == "test"):
         train_dataset = MYDATA(args, args.datasets_folder, args.dataset_name, split)
     else:
         train_dataset = MYTRIPLETDATA(args, args.datasets_folder, args.dataset_name, split)
