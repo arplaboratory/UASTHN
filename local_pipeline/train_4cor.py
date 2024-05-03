@@ -32,7 +32,7 @@ def main(args):
 
     if args.restore_ckpt is not None:
         save_model = torch.load(args.restore_ckpt)
-        model.netG.load_state_dict(save_model['netG'])
+        model.netG.load_state_dict(save_model['netG'], strict=False if args.ue_mock else True)
         if save_model['netG_fine'] is not None:
             model.netG_fine.load_state_dict(save_model['netG_fine'])
         
@@ -59,7 +59,7 @@ def main(args):
 def train(model, train_loader, args, total_steps, last_best_val_mace, train_step_limit = None):
     count = 0
     if args.neg_training:
-        train_loader.dataset.recompute_negatives_random()
+        train_loader.dataset.recompute_negatives_random(args)
     for i_batch, data_blob in enumerate(tqdm(train_loader)):
         tic = time.time()
         if args.neg_training:
