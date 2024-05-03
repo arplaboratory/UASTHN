@@ -507,7 +507,7 @@ class MYTRIPLETDATA(MYDATA):
     def recompute_negatives_random(self, args):
         # This loop's iterations could be done individually in the __getitem__(). This way is slower but clearer (and yields same results)
         self.negative_samples = []
-        for index in self.queries_num:
+        for index in range(self.queries_num):
             # Choose some random database images, from those remove the soft_positives, and then take the first 10 images as neg_indexes
             soft_negatives = self.soft_negatives_per_query[index]
             neg_indexes = np.random.choice(
@@ -558,7 +558,7 @@ class MYTRIPLETDATA(MYDATA):
         query_utm = torch.tensor(self.queries_utms[index]).unsqueeze(0)
         database_utm = torch.tensor(self.database_utms[pos_index]).unsqueeze(0)
     
-        return super().super().__getitem__(self, img, pos_img, query_utm, database_utm, index, pos_index, neg_img)
+        return homo_dataset.__getitem__(self, img, pos_img, query_utm, database_utm, index, pos_index, neg_img)
 
 def fetch_dataloader(args, split='train'):
     if not args.neg_training:

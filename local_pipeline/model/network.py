@@ -6,7 +6,7 @@ import kornia.geometry.bbox as bbox
 from update import GMA
 from extractor import BasicEncoderQuarter
 from corr import CorrBlock
-from utils import coords_grid, sequence_loss, single_loss, single_neg_loss, fetch_optimizer, warp
+from utils import coords_grid, sequence_loss, single_loss, single_neg_loss, sequence_neg_loss, fetch_optimizer, warp
 import os
 import sys
 from model.sync_batchnorm import convert_model
@@ -134,7 +134,7 @@ class IHN(nn.Module):
         self.sz = sz
         four_point_disp = torch.zeros((sz[0], 2, 2, 2)).to(fmap1.device)
         four_point_predictions = []
-        if self.args.ue_mock:
+        if self.args.ue_mock and self.first_stage:
             four_point_ues = []
         # time1 = time.time()
         for itr in range(iters_lev0):
@@ -146,7 +146,7 @@ class IHN(nn.Module):
                     delta_four_point, weight = self.update_block_4(corr, flow)
                 else:
                     delta_four_point = self.update_block_4(corr, flow)
-                    if self.args.ue_mock:
+                    if self.args.ue_mock and self.first_stage:
                         ue_four_point = self.ue_update_block_4(corr, flow)
                     
             try:
@@ -154,7 +154,7 @@ class IHN(nn.Module):
                 four_point_disp =  four_point_disp + delta_four_point[:, :2]
                 coords1 = self.get_flow_now_4(four_point_disp) # Possible error: Unsolvable H
                 four_point_predictions.append(four_point_disp)
-                if self.args.ue_mock:
+                if self.args.ue_mock and self.first_stage:
                     four_point_ues.append(ue_four_point)
             except Exception as e:
                 logging.debug(e)
@@ -162,12 +162,12 @@ class IHN(nn.Module):
                 four_point_disp = last_four_point_disp
                 coords1 = self.get_flow_now_4(four_point_disp) # Possible error: Unsolvable H
                 four_point_predictions.append(four_point_disp)
-                if self.args.ue_mock:
+                if self.args.ue_mock and self.first_stage:
                     four_point_ues.append(ue_four_point)
         # time2 = time.time()
         # print("Time for iterative: " + str(time2 - time1) + " seconds") # 0.12
 
-        if self.args.ue_mock:
+        if self.args.ue_mock and self.first_stage:
             return four_point_predictions, four_point_disp, four_point_ues
         else:
             return four_point_predictions, four_point_disp
@@ -202,7 +202,7 @@ class UAGL():
             if args.restore_ckpt is not None and not args.finetune:
                 self.set_requires_grad(self.netG, False)
         self.criterionAUX = sequence_loss if self.args.arch == "IHN" else single_loss
-        self.criterionNEG = single_neg_loss
+        self.criterionNEG = sequence_neg_loss if self.args.arch == "IHN" else single_neg_loss
         if self.args.first_stage_ue:
             self.ue_rng = np.random.default_rng(seed=args.ue_seed)
         if for_training:
@@ -294,7 +294,7 @@ class UAGL():
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         # time1 = time.time()
         if self.args.first_stage_ue:
-            self.first_stage_ue_generate()
+            self.first_stage_ue_generate(neg_forward=True)
         if self.args.ue_mock:
             four_preds_list_neg, four_pred_neg, self.four_pred_ue_neg = self.netG(image1=self.image_1_neg, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
         else:
@@ -305,7 +305,7 @@ class UAGL():
             # self.four_pred = self.flow_4cor # DEBUG
             _, _ = self.first_stage_ue_aggregation(four_preds_list_neg, four_pred_neg, for_training, neg_forward=True)
             B5, C, H, W = self.image_2.shape
-            self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
+            self.image_1_neg = self.image_1_neg.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
             self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
 
     def get_cropped_st_images(self, image_1_ori, four_pred, fine_padding, detach=True, augment_two_stages=0):
@@ -363,19 +363,32 @@ class UAGL():
         four_preds_list = four_preds_list + four_preds_list_fine
         return four_preds_list, four_pred_fine
 
-    def first_stage_ue_generate(self):
+    def first_stage_ue_generate(self, neg_forward=False):
         B, C, H, W = self.image_2.shape
-        self.image_1 = self.image_1.unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C, H, W)
-        self.image_2 = self.image_2.unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C, H, W)
-        if self.args.ue_aug_method == "shift":
-            bbox_s = self.first_stage_ue_generate_bbox()
-            self.image_2 = tgm.crop_and_resize(self.image_2, bbox_s, (self.args.resize_width, self.args.resize_width))
-        elif self.args.ue_aug_method == "mask":
-            self.image_2 = self.image_2.view(B, self.args.ue_num_crops, C, H, W)
-            mask = torch.rand((self.image_2.shape[0], int(self.args.ue_num_crops - 1), 1, self.image_2.shape[3]//self.args.ue_mask_patchsize, self.image_2.shape[4]//self.args.ue_mask_patchsize)).to(self.image_2.device) > self.args.ue_mask_prob
-            mask = torch.repeat_interleave(torch.repeat_interleave(mask, self.args.ue_mask_patchsize, dim=3), self.args.ue_mask_patchsize, dim=4)
-            self.image_2[:, 1:] = self.image_2[:, 1:] * mask
-            self.image_2 = self.image_2.view(B*self.args.ue_num_crops, C, H, W)            
+        if neg_forward:
+            self.image_1_neg = self.image_1_neg.unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C, H, W)
+            self.image_2 = self.image_2.unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C, H, W)
+            if self.args.ue_aug_method == "shift":
+                bbox_s = self.first_stage_ue_generate_bbox()
+                self.image_2 = tgm.crop_and_resize(self.image_2, bbox_s, (self.args.resize_width, self.args.resize_width))
+            elif self.args.ue_aug_method == "mask":
+                self.image_2 = self.image_2.view(B, self.args.ue_num_crops, C, H, W)
+                mask = torch.rand((self.image_2.shape[0], int(self.args.ue_num_crops - 1), 1, self.image_2.shape[3]//self.args.ue_mask_patchsize, self.image_2.shape[4]//self.args.ue_mask_patchsize)).to(self.image_2.device) > self.args.ue_mask_prob
+                mask = torch.repeat_interleave(torch.repeat_interleave(mask, self.args.ue_mask_patchsize, dim=3), self.args.ue_mask_patchsize, dim=4)
+                self.image_2[:, 1:] = self.image_2[:, 1:] * mask
+                self.image_2 = self.image_2.view(B*self.args.ue_num_crops, C, H, W)    
+        else:
+            self.image_1 = self.image_1.unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C, H, W)
+            self.image_2 = self.image_2.unsqueeze(1).repeat(1, self.args.ue_num_crops, 1, 1, 1).view(B*self.args.ue_num_crops, C, H, W)
+            if self.args.ue_aug_method == "shift":
+                bbox_s = self.first_stage_ue_generate_bbox()
+                self.image_2 = tgm.crop_and_resize(self.image_2, bbox_s, (self.args.resize_width, self.args.resize_width))
+            elif self.args.ue_aug_method == "mask":
+                self.image_2 = self.image_2.view(B, self.args.ue_num_crops, C, H, W)
+                mask = torch.rand((self.image_2.shape[0], int(self.args.ue_num_crops - 1), 1, self.image_2.shape[3]//self.args.ue_mask_patchsize, self.image_2.shape[4]//self.args.ue_mask_patchsize)).to(self.image_2.device) > self.args.ue_mask_prob
+                mask = torch.repeat_interleave(torch.repeat_interleave(mask, self.args.ue_mask_patchsize, dim=3), self.args.ue_mask_patchsize, dim=4)
+                self.image_2[:, 1:] = self.image_2[:, 1:] * mask
+                self.image_2 = self.image_2.view(B*self.args.ue_num_crops, C, H, W)            
 
     def first_stage_ue_aggregation(self, four_preds_list, four_pred, for_training, neg_forward=False):
         alpha = self.args.database_size / self.args.resize_width
@@ -493,7 +506,6 @@ class UAGL():
         """Calculate GAN and L1 loss for the generator"""
         # Second, G(A) = B
         if self.args.ue_mock:
-            raise NotImplementedError()
             self.loss_D = self.criterionNEG(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue=self.four_pred_ue_neg, four_ue_gt=self.std_four_pred_five_crops_neg) 
         else:
             self.loss_D = self.criterionNEG(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue_gt=self.std_four_pred_five_crops_neg) 
