@@ -404,7 +404,7 @@ class UAGL():
         x_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
         y_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
         if self.args.ue_shift_crops_types == "grid" or self.args.ue_shift_crops_types == "grid_relax":
-            if self.args.ue_shift_crop_types == "grid_relax":
+            if self.args.ue_shift_crops_types == "grid_relax":
                 resized_ue_shift_sample = int(self.ue_rng.integers(1, 2*resized_ue_shift))
             else:
                 resized_ue_shift_sample = resized_ue_shift
