@@ -16,6 +16,7 @@ import logging
 from PIL import Image, ImageFile
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as F
+from tqdm import tqdm
 Image.MAX_IMAGE_PIXELS = None
 marginal = 0
 # patch_size = 256
@@ -507,7 +508,7 @@ class MYTRIPLETDATA(MYDATA):
     def recompute_negatives_random(self, args):
         # This loop's iterations could be done individually in the __getitem__(). This way is slower but clearer (and yields same results)
         self.negative_samples = []
-        for index in range(self.queries_num):
+        for index in tqdm(range(self.queries_num)):
             # Choose some random database images, from those remove the soft_positives, and then take the first 10 images as neg_indexes
             soft_negatives = self.soft_negatives_per_query[index]
             neg_indexes = np.random.choice(
@@ -553,7 +554,7 @@ class MYTRIPLETDATA(MYDATA):
             pos_index = random.choice(self.get_positive_indexes(index))
         # pos_img = self._find_img_in_h5(pos_index, database_queries_split="database")
         pos_img = self._find_img_in_map(pos_index, database_queries_split="database")
-        neg_img = self._find_img_in_map(pos_index, database_queries_split="database")
+        neg_img = self._find_img_in_map(self.negative_samples[index], database_queries_split="database")
         
         query_utm = torch.tensor(self.queries_utms[index]).unsqueeze(0)
         database_utm = torch.tensor(self.database_utms[pos_index]).unsqueeze(0)
