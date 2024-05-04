@@ -198,21 +198,38 @@ def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_ue
     metrics['1px'] = (mace < 1).float().mean().item()
     metrics['3px'] = (mace < 3).float().mean().item()
     metrics['mace'] = mace.mean().item()
+    
+    if four_ue is not None:
+        raise NotImplementedError()
 
     return ce_loss, metrics
 
-def single_neg_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_ue_gt=None):
+def single_neg_loss(four_ue, four_ue_pred=None):
     """ Loss function defined over sequence of flow predictions """
-    neg_loss = torch.mean(F.relu(args.neg_margin - four_ue_gt))
+
+    neg_loss = torch.mean(F.relu(args.neg_margin - four_ue))
+
+    if four_ue is not None:
+        raise NotImplementedError()
+
     return neg_loss
 
-def sequence_neg_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_ue_gt=None):
+def sequence_neg_loss(four_ue, four_ue_pred=None):
     """ Loss function defined over sequence of flow predictions """
     neg_loss = 0.0
     for i in range(args.iters_lev0):
         i_weight = gamma ** (args.iters_lev0 - i - 1)
         i4cor_loss = F.relu(args.neg_margin - four_ue_gt)
         neg_loss += i_weight * (i4cor_loss).mean()
+
+    if four_ue_pred is not None:
+        ue_loss = 0.0
+        for i in range(args.iters_lev0):
+            i_weight = gamma ** (args.iters_lev0 - i - 1)
+            i4cor_loss = (four_ue_pred[i].view(-1, 5, 2, 2, 2)[:, 0] - four_ue)**2
+            ue_loss += i_weight * (i4cor_loss).mean()
+        neg_loss += args.ue_mock_loss_lambda * ue_loss
+
     return neg_loss
 
 def fetch_optimizer(args, model_para):
