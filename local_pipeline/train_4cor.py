@@ -111,7 +111,9 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
                 "G_loss": metrics["G_loss"],
                 "D_loss": metrics["D_loss"] if args.neg_training else 0,
                 "ue_loss": metrics["ue_loss"] if args.ue_mock else 0,
-                "ce_loss": metrics["ce_loss"]
+                "ce_loss": metrics["ce_loss"],
+                "ue_neg_loss": metrics["ue_neg_loss"] if args.neg_training and args.ue_mock else 0,
+                "neg_loss": metrics["neg_loss"] if args.neg_training else 0,
             },)
         total_steps += 1
         # Validate

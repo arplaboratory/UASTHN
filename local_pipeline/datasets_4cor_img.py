@@ -17,6 +17,7 @@ from PIL import Image, ImageFile
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as F
 from tqdm import tqdm
+import math
 Image.MAX_IMAGE_PIXELS = None
 marginal = 0
 # patch_size = 256
@@ -492,7 +493,7 @@ class MYTRIPLETDATA(MYDATA):
     def __init__(self, args, datasets_folder="datasets", dataset_name="pitts30k", split="train"):
         super().__init__(args, datasets_folder, dataset_name, split)
         self.mining = "random" # default to random
-        self.neg_dist_threshold = args.database_size // 2 + 512 // 2
+        self.neg_dist_threshold = (args.database_size // 2 + 512 // 2) * math.sqrt(2) # Outside of image
 
         # Find soft_negatives_per_query, which are within train_positives_dist_threshold (10 meters)
         knn = NearestNeighbors(n_jobs=-1)

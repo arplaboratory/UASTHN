@@ -64,6 +64,7 @@ def parse_arguments():
     parser.add_argument("--check_step", type=int, default=-1, choices=[-1,0,1,2,3,4,5])
     parser.add_argument("--neg_training", action="store_true")
     parser.add_argument("--neg_margin", type=float, default=16.0)
+    parser.add_argument("--neg_loss_lambda", type=float, default=1.0, help="G_loss_lambda only for homo")
     args = parser.parse_args()
     args.save_dir = "local_he"
     args.augment_type = "center"
