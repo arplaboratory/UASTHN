@@ -143,7 +143,7 @@ def warp(x, flo):
     return output * mask
 
 
-def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_ue_gt=None):
+def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None, four_ue_gt_list=None):
     """ Loss function defined over sequence of flow predictions """
 
     flow_4cor = torch.zeros((four_preds[0].shape[0], 2, 2, 2)).to(four_preds[0].device)
@@ -171,11 +171,11 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_
     metrics['mace'] = mace.mean().item()
     metrics['ce_loss'] = ce_loss.item()
 
-    if four_ue is not None:
+    if four_ue_list is not None:
         ue_loss = 0.0
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
-            i4cor_loss = (four_ue[i].view(-1, 5, 2, 2, 2)[:, 0] - four_ue_gt)**2
+            i4cor_loss = (four_ue_list[i].view(-1, 5, 2, 2, 2)[:, 0] - four_ue_gt_list[i]).abs()
             ue_loss += i_weight * (i4cor_loss).mean()
         ce_loss += args.ue_mock_loss_lambda * ue_loss
         metrics['ue_loss'] = ue_loss.item()
@@ -183,7 +183,7 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_
     return ce_loss, metrics
 
 
-def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_ue_gt=None):
+def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None, four_ue_gt_list=None):
     """ Loss function defined over sequence of flow predictions """
 
     flow_4cor = torch.zeros((four_preds[0].shape[0], 2, 2, 2)).to(four_preds[0].device)
@@ -200,15 +200,15 @@ def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue=None, four_ue
     metrics['mace'] = mace.mean().item()
     metrics['ce_loss'] = ce_loss.item()
     
-    if four_ue is not None:
+    if four_ue_list is not None:
         raise NotImplementedError()
 
     return ce_loss, metrics
 
-def single_neg_loss(args, metrics, four_ue, four_ue_pred=None):
+def single_neg_loss(gamma, args, metrics, four_ue_list, four_ue_pred_list=None):
     """ Loss function defined over sequence of flow predictions """
 
-    neg_loss = torch.mean(F.relu(args.neg_margin - four_ue))
+    neg_loss = torch.mean(F.relu(args.neg_margin - four_ue_list[0]))
     metrics['neg_loss'] = neg_loss.item()
     neg_loss = args.neg_loss_lambda * neg_loss
     if four_ue is not None:
@@ -216,24 +216,24 @@ def single_neg_loss(args, metrics, four_ue, four_ue_pred=None):
 
     return neg_loss, metrics
 
-def sequence_neg_loss(args, metrics, four_ue, four_ue_pred=None):
+def sequence_neg_loss(gamma, args, metrics, four_ue_list, four_ue_pred_list=None):
     """ Loss function defined over sequence of flow predictions """
     neg_loss = 0.0
     for i in range(args.iters_lev0):
         i_weight = gamma ** (args.iters_lev0 - i - 1)
-        i4cor_loss = F.relu(args.neg_margin - four_ue_gt)
+        i4cor_loss = F.relu(args.neg_margin - four_ue_list[i])
         neg_loss += i_weight * (i4cor_loss).mean()
     metrics['neg_loss'] = neg_loss.item()
     neg_loss = args.neg_loss_lambda * neg_loss
 
-    if four_ue_pred is not None:
+    if four_ue_pred_list is not None:
         ue_loss = 0.0
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
-            i4cor_loss = (four_ue_pred[i].view(-1, 5, 2, 2, 2)[:, 0] - four_ue)**2
+            i4cor_loss = F.relu(args.neg_margin - four_ue_pred_list[i].view(-1, 5, 2, 2, 2)[:, 0]).abs()
             ue_loss += i_weight * (i4cor_loss).mean()
         metrics['ue_neg_loss'] = ue_loss.item()
-        neg_loss += args.ue_mock_loss_lambda * ue_loss
+        neg_loss += args.ue_mock_neg_loss_lambda * ue_loss
     
     return neg_loss, metrics
 

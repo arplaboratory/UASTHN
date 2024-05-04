@@ -255,7 +255,7 @@ class UAGL():
         if self.args.first_stage_ue:
             self.first_stage_ue_generate()
         if self.args.ue_mock:
-            self.four_preds_list, self.four_pred, self.four_pred_ue = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
+            self.four_preds_list, self.four_pred, self.four_pred_ue_list = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
         else:
             self.four_preds_list, self.four_pred = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
         if self.args.first_stage_ue:
@@ -296,7 +296,7 @@ class UAGL():
         if self.args.first_stage_ue:
             self.first_stage_ue_generate(neg_forward=True)
         if self.args.ue_mock:
-            four_preds_list_neg, four_pred_neg, self.four_pred_ue_neg = self.netG(image1=self.image_1_neg, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
+            four_preds_list_neg, four_pred_neg, self.four_pred_ue_neg_list = self.netG(image1=self.image_1_neg, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
         else:
             four_preds_list_neg, four_pred_neg = self.netG(image1=self.image_1_neg, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
         if self.args.first_stage_ue:
@@ -393,9 +393,9 @@ class UAGL():
     def first_stage_ue_aggregation(self, four_preds_list, four_pred, for_training, neg_forward=False):
         alpha = self.args.database_size / self.args.resize_width
         if not neg_forward:
-            four_preds_list, four_pred, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
+            four_preds_list, four_pred, self.std_four_preds_list, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
         else:
-            four_preds_list, four_pred, self.std_four_pred_five_crops_neg = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
+            four_preds_list, four_pred, self.std_four_preds_neg_list, self.std_four_pred_five_crops_neg = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
         return four_preds_list, four_pred
 
     def first_stage_ue_generate_bbox(self):
@@ -487,18 +487,21 @@ class UAGL():
             four_pred_agg_list.append(four_pred_agg)
         four_pred_new = torch.stack(four_pred_agg_list)
         four_preds_list_new = []
+        four_preds_std_list_new = []
         for i in range(len(four_preds_list)):
             four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
             # Mean for training
+            std_four_pred_single = torch.std(four_pred_single, dim=1)
             mean_four_pred_single = torch.mean(four_pred_single, dim=1)
             four_preds_list_new.append(mean_four_pred_single)
-        return four_preds_list_new, four_pred_new, std_four_pred_five_crops
+            four_preds_std_list_new.append(std_four_pred_single)
+        return four_preds_list_new, four_pred_new, four_preds_std_list_new, std_four_pred_five_crops
 
     def backward_G(self):
         """Calculate GAN and L1 loss for the generator"""
         # Second, G(A) = B
         if self.args.ue_mock:
-            self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue=self.four_pred_ue, four_ue_gt=self.std_four_pred_five_crops) 
+            self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue_list=self.four_pred_ue_list, four_ue_gt_list=self.std_four_preds_list) 
         else:
             self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics) 
         # combine loss and calculate gradients
@@ -510,9 +513,9 @@ class UAGL():
         """Calculate GAN and L1 loss for the generator"""
         # Second, G(A) = B
         if self.args.ue_mock:
-            self.loss_D, self.metrics = self.criterionNEG(self.args, self.metrics, self.std_four_pred_five_crops_neg, self.four_pred_ue_neg) 
+            self.loss_D, self.metrics = self.criterionNEG(self.args.gamma, self.args, self.metrics, self.std_four_preds_neg_list, self.four_pred_ue_neg_list) 
         else:
-            self.loss_D, self.metrics = self.criterionNEG(self.args, self.metrics, self.std_four_pred_five_crops_neg) 
+            self.loss_D, self.metrics = self.criterionNEG(self.args.gamma, self.args, self.metrics, self.std_four_preds_neg_list) 
         # combine loss and calculate gradients
         self.metrics["D_loss"] = self.loss_D.cpu().item()
         self.loss_D.backward()
