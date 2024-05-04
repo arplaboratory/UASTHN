@@ -510,7 +510,7 @@ class UAGL():
         """Calculate GAN and L1 loss for the generator"""
         # Second, G(A) = B
         if self.args.ue_mock:
-            self.loss_D = self.criterionNEG(self.four_pred_ue_neg, self.std_four_pred_five_crops_neg) 
+            self.loss_D = self.criterionNEG(self.std_four_pred_five_crops_neg, self.four_pred_ue_neg) 
         else:
             self.loss_D = self.criterionNEG(self.std_four_pred_five_crops_neg) 
         # combine loss and calculate gradients
