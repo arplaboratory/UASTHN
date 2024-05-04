@@ -31,7 +31,7 @@ def test(args, wandb_log):
         for key in list(model_med['netG'].keys()):
             if key.startswith('module'):
                 del model_med['netG'][key]
-        model.netG.load_state_dict(model_med['netG'], strict=False)
+        model.netG.load_state_dict(model_med['netG'], strict=False if args.ue_mock else True)
         if args.two_stages:
             model_med = torch.load(args.eval_model, map_location='cuda:0')
             for key in list(model_med['netG_fine'].keys()):
@@ -39,7 +39,7 @@ def test(args, wandb_log):
             for key in list(model_med['netG_fine'].keys()):
                 if key.startswith('module'):
                     del model_med['netG_fine'][key]
-            model.netG_fine.load_state_dict(model_med['netG_fine'])
+            model.netG_fine.load_state_dict(model_med['netG_fine'], strict=False if args.ue_mock else True)
         
         model.setup() 
         model.netG.eval()

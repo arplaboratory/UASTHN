@@ -51,9 +51,9 @@ def main(args):
 
     test_dataset = datasets.fetch_dataloader(args, split='test')
     model_med = torch.load(args.save_dir + f'/{args.name}.pth')
-    model.netG.load_state_dict(model_med['netG'])
+    model.netG.load_state_dict(model_med['netG'], strict=False if args.ue_mock else True)
     if args.two_stages:
-        model.netG_fine.load_state_dict(model_med['netG_fine'])
+        model.netG_fine.load_state_dict(model_med['netG_fine'], strict=False if args.ue_mock else True)
     evaluate_SNet(model, test_dataset, batch_size=args.batch_size, args=args, wandb_log=True)
 
 def train(model, train_loader, args, total_steps, last_best_val_mace, train_step_limit = None):
