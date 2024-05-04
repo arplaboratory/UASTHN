@@ -36,25 +36,25 @@ inv_base_transforms = transforms.Compose(
 )
 
 class homo_dataset(data.Dataset):
-    def __init__(self, args, permute=False):
+    def __init__(self, args, augment=False):
 
         self.args = args
         self.is_test = False
         self.image_list_img1 = []
         self.image_list_img2 = []
         self.dataset=[]
-        self.permute = permute
-        if self.permute: # EVAL
+        self.augment = augment
+        if self.augment: # EVAL
             if self.args.eval_model is not None:
                 self.rng = None
             else:
-                self.permute_type = ["no"]
-                if self.args.permute_max > 0:
-                    self.permute_type.append("permute")
+                self.augment_type = ["no"]
+                if self.args.perspective_max > 0:
+                    self.augment_type.append("perspective")
                 if self.args.rotate_max > 0:
-                    self.permute_type.append("rotate")
+                    self.augment_type.append("rotate")
                 if self.args.resize_max > 0:
-                    self.permute_type.append("resize")
+                    self.augment_type.append("resize")
         base_transform = transforms.Compose(
             [
                 transforms.Resize([self.args.resize_width, self.args.resize_width]),
@@ -68,49 +68,49 @@ class homo_dataset(data.Dataset):
             ]
         )
         
-    def rotate_transform(self, rotation, four_point_org, four_point_1, four_point_org_permute, four_point_1_permute):
+    def rotate_transform(self, rotation, four_point_org, four_point_1, four_point_org_augment, four_point_1_augment):
         center_x_org = torch.tensor((self.args.resize_width - 1)/2)
         center_x_1 = (four_point_1[0, 0, :] + four_point_1[0, 3, :])/2
-        four_point_org_permute[0, 0, 0] = (four_point_org[0, 0, 0] - center_x_org) * torch.cos(rotation) - (four_point_org[0, 0, 1] - center_x_org) * torch.sin(rotation) + center_x_org
-        four_point_org_permute[0, 0, 1] = (four_point_org[0, 0, 0] - center_x_org) * torch.sin(rotation) + (four_point_org[0, 0, 1] - center_x_org) * torch.cos(rotation) + center_x_org
-        four_point_org_permute[0, 1, 0] = (four_point_org[0, 1, 0] - center_x_org) * torch.cos(rotation) - (four_point_org[0, 1, 1] - center_x_org) * torch.sin(rotation) + center_x_org
-        four_point_org_permute[0, 1, 1] = (four_point_org[0, 1, 0] - center_x_org) * torch.sin(rotation) + (four_point_org[0, 1, 1] - center_x_org) * torch.cos(rotation) + center_x_org
-        four_point_org_permute[0, 2, 0] = (four_point_org[0, 2, 0] - center_x_org) * torch.cos(rotation) - (four_point_org[0, 2, 1] - center_x_org) * torch.sin(rotation) + center_x_org
-        four_point_org_permute[0, 2, 1] = (four_point_org[0, 2, 0] - center_x_org) * torch.sin(rotation) + (four_point_org[0, 2, 1] - center_x_org) * torch.cos(rotation) + center_x_org
-        four_point_org_permute[0, 3, 0] = (four_point_org[0, 3, 0] - center_x_org) * torch.cos(rotation) - (four_point_org[0, 3, 1] - center_x_org) * torch.sin(rotation) + center_x_org
-        four_point_org_permute[0, 3, 1] = (four_point_org[0, 3, 0] - center_x_org) * torch.sin(rotation) + (four_point_org[0, 3, 1] - center_x_org) * torch.cos(rotation) + center_x_org
-        four_point_1_permute[0, 0, 0] = (four_point_1[0, 0, 0] - center_x_1[0]) * torch.cos(rotation) - (four_point_1[0, 0, 1] - center_x_1[1]) * torch.sin(rotation) + center_x_1[0]
-        four_point_1_permute[0, 0, 1] = (four_point_1[0, 0, 0] - center_x_1[0]) * torch.sin(rotation) + (four_point_1[0, 0, 1] - center_x_1[1]) * torch.cos(rotation) + center_x_1[1]
-        four_point_1_permute[0, 1, 0] = (four_point_1[0, 1, 0] - center_x_1[0]) * torch.cos(rotation) - (four_point_1[0, 1, 1] - center_x_1[1]) * torch.sin(rotation) + center_x_1[0]
-        four_point_1_permute[0, 1, 1] = (four_point_1[0, 1, 0] - center_x_1[0]) * torch.sin(rotation) + (four_point_1[0, 1, 1] - center_x_1[1]) * torch.cos(rotation) + center_x_1[1]
-        four_point_1_permute[0, 2, 0] = (four_point_1[0, 2, 0] - center_x_1[0]) * torch.cos(rotation) - (four_point_1[0, 2, 1] - center_x_1[1]) * torch.sin(rotation) + center_x_1[0]
-        four_point_1_permute[0, 2, 1] = (four_point_1[0, 2, 0] - center_x_1[0]) * torch.sin(rotation) + (four_point_1[0, 2, 1] - center_x_1[1]) * torch.cos(rotation) + center_x_1[1]
-        four_point_1_permute[0, 3, 0] = (four_point_1[0, 3, 0] - center_x_1[0]) * torch.cos(rotation) - (four_point_1[0, 3, 1] - center_x_1[1]) * torch.sin(rotation) + center_x_1[0]
-        four_point_1_permute[0, 3, 1] = (four_point_1[0, 3, 0] - center_x_1[0]) * torch.sin(rotation) + (four_point_1[0, 3, 1] - center_x_1[1]) * torch.cos(rotation) + center_x_1[1]
+        four_point_org_augment[0, 0, 0] = (four_point_org[0, 0, 0] - center_x_org) * torch.cos(rotation) - (four_point_org[0, 0, 1] - center_x_org) * torch.sin(rotation) + center_x_org
+        four_point_org_augment[0, 0, 1] = (four_point_org[0, 0, 0] - center_x_org) * torch.sin(rotation) + (four_point_org[0, 0, 1] - center_x_org) * torch.cos(rotation) + center_x_org
+        four_point_org_augment[0, 1, 0] = (four_point_org[0, 1, 0] - center_x_org) * torch.cos(rotation) - (four_point_org[0, 1, 1] - center_x_org) * torch.sin(rotation) + center_x_org
+        four_point_org_augment[0, 1, 1] = (four_point_org[0, 1, 0] - center_x_org) * torch.sin(rotation) + (four_point_org[0, 1, 1] - center_x_org) * torch.cos(rotation) + center_x_org
+        four_point_org_augment[0, 2, 0] = (four_point_org[0, 2, 0] - center_x_org) * torch.cos(rotation) - (four_point_org[0, 2, 1] - center_x_org) * torch.sin(rotation) + center_x_org
+        four_point_org_augment[0, 2, 1] = (four_point_org[0, 2, 0] - center_x_org) * torch.sin(rotation) + (four_point_org[0, 2, 1] - center_x_org) * torch.cos(rotation) + center_x_org
+        four_point_org_augment[0, 3, 0] = (four_point_org[0, 3, 0] - center_x_org) * torch.cos(rotation) - (four_point_org[0, 3, 1] - center_x_org) * torch.sin(rotation) + center_x_org
+        four_point_org_augment[0, 3, 1] = (four_point_org[0, 3, 0] - center_x_org) * torch.sin(rotation) + (four_point_org[0, 3, 1] - center_x_org) * torch.cos(rotation) + center_x_org
+        four_point_1_augment[0, 0, 0] = (four_point_1[0, 0, 0] - center_x_1[0]) * torch.cos(rotation) - (four_point_1[0, 0, 1] - center_x_1[1]) * torch.sin(rotation) + center_x_1[0]
+        four_point_1_augment[0, 0, 1] = (four_point_1[0, 0, 0] - center_x_1[0]) * torch.sin(rotation) + (four_point_1[0, 0, 1] - center_x_1[1]) * torch.cos(rotation) + center_x_1[1]
+        four_point_1_augment[0, 1, 0] = (four_point_1[0, 1, 0] - center_x_1[0]) * torch.cos(rotation) - (four_point_1[0, 1, 1] - center_x_1[1]) * torch.sin(rotation) + center_x_1[0]
+        four_point_1_augment[0, 1, 1] = (four_point_1[0, 1, 0] - center_x_1[0]) * torch.sin(rotation) + (four_point_1[0, 1, 1] - center_x_1[1]) * torch.cos(rotation) + center_x_1[1]
+        four_point_1_augment[0, 2, 0] = (four_point_1[0, 2, 0] - center_x_1[0]) * torch.cos(rotation) - (four_point_1[0, 2, 1] - center_x_1[1]) * torch.sin(rotation) + center_x_1[0]
+        four_point_1_augment[0, 2, 1] = (four_point_1[0, 2, 0] - center_x_1[0]) * torch.sin(rotation) + (four_point_1[0, 2, 1] - center_x_1[1]) * torch.cos(rotation) + center_x_1[1]
+        four_point_1_augment[0, 3, 0] = (four_point_1[0, 3, 0] - center_x_1[0]) * torch.cos(rotation) - (four_point_1[0, 3, 1] - center_x_1[1]) * torch.sin(rotation) + center_x_1[0]
+        four_point_1_augment[0, 3, 1] = (four_point_1[0, 3, 0] - center_x_1[0]) * torch.sin(rotation) + (four_point_1[0, 3, 1] - center_x_1[1]) * torch.cos(rotation) + center_x_1[1]
         # print("ori:", four_point_org[0, 0, 0], four_point_org[0, 0, 1], four_point_1[0, 0, 0], four_point_1[0, 0, 1])
-        # print("now:", four_point_org_permute[0, 0, 0], four_point_org_permute[0, 0, 1], four_point_1_permute[0, 0, 0], four_point_1_permute[0, 0, 1])
+        # print("now:", four_point_org_augment[0, 0, 0], four_point_org_augment[0, 0, 1], four_point_1_augment[0, 0, 0], four_point_1_augment[0, 0, 1])
         # print("center:", center_x_1, four_point_1[0, 0, :], four_point_1[0, 3, :])
-        return four_point_org_permute, four_point_1_permute
+        return four_point_org_augment, four_point_1_augment
 
-    def resize_transform(self, scale_factor, beta, alpha, four_point_org_permute, four_point_1_permute):
+    def resize_transform(self, scale_factor, beta, alpha, four_point_org_augment, four_point_1_augment):
         offset = self.args.resize_width * (1 - scale_factor) / 2
-        four_point_org_permute[0, 0, 0] += offset
-        four_point_org_permute[0, 0, 1] += offset
-        four_point_org_permute[0, 1, 0] -= offset
-        four_point_org_permute[0, 1, 1] += offset
-        four_point_org_permute[0, 2, 0] += offset
-        four_point_org_permute[0, 2, 1] -= offset
-        four_point_org_permute[0, 3, 0] -= offset
-        four_point_org_permute[0, 3, 1] -= offset
-        four_point_1_permute[0, 0, 0] += offset * beta / alpha
-        four_point_1_permute[0, 0, 1] += offset * beta / alpha
-        four_point_1_permute[0, 1, 0] -= offset * beta / alpha
-        four_point_1_permute[0, 1, 1] += offset * beta / alpha
-        four_point_1_permute[0, 2, 0] += offset * beta / alpha
-        four_point_1_permute[0, 2, 1] -= offset * beta / alpha
-        four_point_1_permute[0, 3, 0] -= offset * beta / alpha
-        four_point_1_permute[0, 3, 1] -= offset * beta / alpha
-        return four_point_org_permute, four_point_1_permute
+        four_point_org_augment[0, 0, 0] += offset
+        four_point_org_augment[0, 0, 1] += offset
+        four_point_org_augment[0, 1, 0] -= offset
+        four_point_org_augment[0, 1, 1] += offset
+        four_point_org_augment[0, 2, 0] += offset
+        four_point_org_augment[0, 2, 1] -= offset
+        four_point_org_augment[0, 3, 0] -= offset
+        four_point_org_augment[0, 3, 1] -= offset
+        four_point_1_augment[0, 0, 0] += offset * beta / alpha
+        four_point_1_augment[0, 0, 1] += offset * beta / alpha
+        four_point_1_augment[0, 1, 0] -= offset * beta / alpha
+        four_point_1_augment[0, 1, 1] += offset * beta / alpha
+        four_point_1_augment[0, 2, 0] += offset * beta / alpha
+        four_point_1_augment[0, 2, 1] -= offset * beta / alpha
+        four_point_1_augment[0, 3, 0] -= offset * beta / alpha
+        four_point_1_augment[0, 3, 1] -= offset * beta / alpha
+        return four_point_org_augment, four_point_1_augment
 
     def __getitem__(self, query_PIL_image, database_PIL_image, query_utm, database_utm, index, pos_index, neg_img2=None):
         if hasattr(self, "rng") and self.rng is None:
@@ -188,50 +188,50 @@ class homo_dataset(data.Dataset):
         four_point_org = four_point_org.flatten(1).permute(1, 0).unsqueeze(0).contiguous() 
         four_point_1 = four_point_1.flatten(1).permute(1, 0).unsqueeze(0).contiguous() 
         
-        if self.permute:
-            #permute
-            four_point_org_permute = four_point_org.clone()
-            four_point_1_permute = four_point_1.clone()
+        if self.augment:
+            #augment
+            four_point_org_augment = four_point_org.clone()
+            four_point_1_augment = four_point_1.clone()
             beta = 512/self.args.resize_width
-            if self.args.eval_model is None: # EVAL
-                permute_type_single = random.choice(self.permute_type)
-                if permute_type_single == "rotate":
+            if self.args.eval_model is None or self.args.multi_aug_eval: # EVAL
+                augment_type_single = random.choice(self.augment_type)
+                if augment_type_single == "rotate":
                     rotation = torch.tensor(random.random() - 0.5) * 2 * self.args.rotate_max # on 256x256
-                    four_point_org_permute, four_point_1_permute = self.rotate_transform(rotation, four_point_org, four_point_1, four_point_org_permute, four_point_1_permute)
-                elif permute_type_single == "resize":
+                    four_point_org_augment, four_point_1_augment = self.rotate_transform(rotation, four_point_org, four_point_1, four_point_org_augment, four_point_1_augment)
+                elif augment_type_single == "resize":
                     scale_factor = 1 + (random.random() - 0.5) * 2 * self.args.resize_max # on 256x256
                     assert scale_factor > 0
-                    four_point_org_permute, four_point_1_permute = self.resize_transform(scale_factor, beta, alpha, four_point_org_permute, four_point_1_permute)
-                elif permute_type_single == "permute":
+                    four_point_org_augment, four_point_1_augment = self.resize_transform(scale_factor, beta, alpha, four_point_org_augment, four_point_1_augment)
+                elif augment_type_single == "perspective":
                     for p in range(4):
                         for xy in range(2):
-                            t1 = random.randint(-self.args.permute_max, self.args.permute_max)
-                            four_point_org_permute[0, p, xy] += t1 # original for 256
-                            four_point_1_permute[0, p, xy] += t1 * beta / alpha # original for 256 then to 512 in 1536 scale then to 256 in 1536 scale
-                elif permute_type_single == "no":
+                            t1 = random.randint(-self.args.perspective_max, self.args.perspective_max)
+                            four_point_org_augment[0, p, xy] += t1 # original for 256
+                            four_point_1_augment[0, p, xy] += t1 * beta / alpha # original for 256 then to 512 in 1536 scale then to 256 in 1536 scale
+                elif augment_type_single == "no":
                     pass
                 else:
                     raise NotImplementedError()
             else:
                 if self.args.rotate_max!=0:
                     rotation = torch.tensor(self.rng.random() - 0.5) * 2 * self.args.rotate_max # on 256x256
-                    four_point_org_permute, four_point_1_permute = self.rotate_transform(rotation, four_point_org, four_point_1, four_point_org_permute, four_point_1_permute)
+                    four_point_org_augment, four_point_1_augment = self.rotate_transform(rotation, four_point_org, four_point_1, four_point_org_augment, four_point_1_augment)
                 elif self.args.resize_max!=0:
                     scale_factor = 1 + (self.rng.random() - 0.5) * 2 * self.args.resize_max # on 256x256
                     assert scale_factor > 0
-                    four_point_org_permute, four_point_1_permute = self.resize_transform(scale_factor, beta, alpha, four_point_org_permute, four_point_1_permute)
-                elif self.args.permute_max!=0:
+                    four_point_org_augment, four_point_1_augment = self.resize_transform(scale_factor, beta, alpha, four_point_org_augment, four_point_1_augment)
+                elif self.args.perspective_max!=0:
                     for p in range(4):
                         for xy in range(2):
-                            t1 = self.rng.integers(-self.args.permute_max, self.args.permute_max) # on 256x256
-                            four_point_org_permute[0, p, xy] += t1 # original for 256
-                            four_point_1_permute[0, p, xy] += t1 * beta / alpha # original for 256 then to 512 in 1536 scale then to 256 in 1536 scale
+                            t1 = self.rng.integers(-self.args.perspective_max, self.args.perspective_max) # on 256x256
+                            four_point_org_augment[0, p, xy] += t1 # original for 256
+                            four_point_1_augment[0, p, xy] += t1 * beta / alpha # original for 256 then to 512 in 1536 scale then to 256 in 1536 scale
                 else:
                     raise NotImplementedError()
-            H = tgm.get_perspective_transform(four_point_org, four_point_org_permute)
+            H = tgm.get_perspective_transform(four_point_org, four_point_org_augment)
             H_inverse = torch.inverse(H)
             img1 = tgm.warp_perspective(img1.unsqueeze(0), H_inverse, (self.args.resize_width, self.args.resize_width)).squeeze(0)
-            four_point_1 = four_point_1_permute
+            four_point_1 = four_point_1_augment
 
         H = tgm.get_perspective_transform(four_point_org, four_point_1)
         H = H.squeeze()
@@ -255,7 +255,7 @@ class homo_dataset(data.Dataset):
 
 class MYDATA(homo_dataset):
     def __init__(self, args, datasets_folder="datasets", dataset_name="pitts30k", split="train"):
-        super(MYDATA, self).__init__(args, permute= (args.permute == "img"))
+        super(MYDATA, self).__init__(args, augment= (args.augment == "img"))
         self.args = args
         self.dataset_name = dataset_name
         self.split = split
