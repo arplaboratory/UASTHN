@@ -34,7 +34,7 @@ def main(args):
         save_model = torch.load(args.restore_ckpt)
         model.netG.load_state_dict(save_model['netG'], strict=False if args.ue_mock else True)
         if save_model['netG_fine'] is not None:
-            model.netG_fine.load_state_dict(save_model['netG_fine'])
+            model.netG_fine.load_state_dict(save_model['netG_fine'], strict=False if args.ue_mock else True)
         
     train_loader = datasets.fetch_dataloader(args, split="train")
     if os.path.exists(os.path.join(args.datasets_folder, args.dataset_name, "extended_queries.h5")):
