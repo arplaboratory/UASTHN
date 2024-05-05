@@ -514,10 +514,15 @@ class MYTRIPLETDATA(MYDATA):
             soft_negatives = self.soft_negatives_per_query[index]
             neg_indexes = np.random.choice(
                 self.database_num,
-                size= 1 + len(soft_negatives),
+                size=1,
                 replace=False,
                 )
-            neg_indexes = np.setdiff1d(neg_indexes, soft_negatives, assume_unique=True)[0]
+            while neg_indexes in soft_negatives:
+                neg_indexes = np.random.choice(
+                self.database_num,
+                size=1,
+                replace=False,
+                )
             self.negative_samples.append(
                 neg_indexes
             )

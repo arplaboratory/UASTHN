@@ -175,7 +175,7 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None, 
         ue_loss = 0.0
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
-            i4cor_loss = (four_ue_list[i].view(-1, 5, 2, 2, 2)[:, 0] - four_ue_gt_list[i]).abs()
+            i4cor_loss = (four_ue_list[i].view(-1, args.ue_num_crops, 2, 2, 2)[:, 0] - four_ue_gt_list[i]).abs()
             ue_loss += i_weight * (i4cor_loss).mean()
         ce_loss += args.ue_mock_loss_lambda * ue_loss
         metrics['ue_loss'] = ue_loss.item()
@@ -230,7 +230,7 @@ def sequence_neg_loss(gamma, args, metrics, four_ue_list, four_ue_pred_list=None
         ue_loss = 0.0
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
-            i4cor_loss = F.relu(args.neg_margin - four_ue_pred_list[i].view(-1, 5, 2, 2, 2)[:, 0]).abs()
+            i4cor_loss = F.relu(args.neg_margin - four_ue_pred_list[i].view(-1, args.ue_num_crops, 2, 2, 2)[:, 0])
             ue_loss += i_weight * (i4cor_loss).mean()
         metrics['ue_neg_loss'] = ue_loss.item()
         neg_loss += args.ue_mock_neg_loss_lambda * ue_loss
