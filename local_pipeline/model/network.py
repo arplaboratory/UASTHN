@@ -252,13 +252,13 @@ class UAGL():
     def forward(self, for_training=False):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         # time1 = time.time()
-        if self.args.first_stage_ue:
+        if self.args.first_stage_ue and not self.args.ue_mock:
             self.first_stage_ue_generate()
         if self.args.ue_mock:
             self.four_preds_list, self.four_pred, self.four_pred_ue_list = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
         else:
             self.four_preds_list, self.four_pred = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
-        if self.args.first_stage_ue:
+        if self.args.first_stage_ue and not self.args.ue_mock:
             # for i in range(len(self.four_preds_list)): # DEBUG
             #     self.four_preds_list[i] = self.flow_4cor # DEBUG
             # self.four_pred = self.flow_4cor # DEBUG
@@ -268,6 +268,8 @@ class UAGL():
             self.image_2_multi = self.image_2
             self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
             self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
+        elif self.args.first_stage_ue and self.args.ue_mock:
+            self.std_four_pred_five_crops = self.four_pred_ue_list
         # time2 = time.time()
         # logging.debug("Time for 1st forward pass: " + str(time2 - time1) + " seconds")
         if self.args.two_stages:
@@ -394,10 +396,10 @@ class UAGL():
         alpha = self.args.database_size / self.args.resize_width
         if not neg_forward:
             four_preds_list, four_pred, self.std_four_preds_list, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
-            # print("Positve UE std: " + str((self.std_four_pred_five_crops).max()))
+            print("Positve UE std: " + str((self.std_four_pred_five_crops).max()))
         else:
             four_preds_list, four_pred, self.std_four_preds_neg_list, self.std_four_pred_five_crops_neg = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
-            # print("Negative UE std: " + str((self.std_four_pred_five_crops_neg).min()))
+            print("Negative UE std: " + str((self.std_four_pred_five_crops_neg).min()))
         return four_preds_list, four_pred
 
     def first_stage_ue_generate_bbox(self):
