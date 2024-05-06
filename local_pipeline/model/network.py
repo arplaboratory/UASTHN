@@ -269,7 +269,7 @@ class UAGL():
             self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
             self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
         elif self.args.first_stage_ue and self.args.ue_mock:
-            self.std_four_pred_five_crops = self.four_pred_ue_list
+            self.std_four_pred_five_crops = self.four_pred_ue_list[-1]
         # time2 = time.time()
         # logging.debug("Time for 1st forward pass: " + str(time2 - time1) + " seconds")
         if self.args.two_stages:
