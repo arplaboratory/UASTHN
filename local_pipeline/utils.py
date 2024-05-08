@@ -93,7 +93,7 @@ def save_overlap_bbox_img(img1, img2, path, four_point_gt, four_point_pred, crop
     img2 = np.array(img2_tensor.permute(1, 2, 0)).astype(np.uint8)
     plt.imshow(img2)
     plt.imshow(img1, alpha=0.25)
-    if not ue_mask.all():
+    if ue_mask[0, 1] == False:
         path = path.split('.')[0]+"_rej.png"
     plt.savefig(path, bbox_inches='tight', pad_inches=0)
     plt.close()
@@ -154,22 +154,23 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None, 
 
     ce_loss = 0.0
 
-    for i in range(args.iters_lev0):
-        i_weight = gamma ** (args.iters_lev0 - i - 1)
-        i4cor_loss = (four_preds[i] - flow_4cor).abs()
-        ce_loss += i_weight * (i4cor_loss).mean()
-
-    if args.two_stages:
-        for i in range(args.iters_lev0, args.iters_lev1 + args.iters_lev0):
-            i_weight = gamma ** (args.iters_lev1 + args.iters_lev0 - i - 1)
+    if not args.ue_mock_freeze:
+        for i in range(args.iters_lev0):
+            i_weight = gamma ** (args.iters_lev0 - i - 1)
             i4cor_loss = (four_preds[i] - flow_4cor).abs()
             ce_loss += i_weight * (i4cor_loss).mean()
+
+        if args.two_stages:
+            for i in range(args.iters_lev0, args.iters_lev1 + args.iters_lev0):
+                i_weight = gamma ** (args.iters_lev1 + args.iters_lev0 - i - 1)
+                i4cor_loss = (four_preds[i] - flow_4cor).abs()
+                ce_loss += i_weight * (i4cor_loss).mean()
+        metrics['ce_loss'] = ce_loss.item()
 
     mace = torch.sum((four_preds[-1] - flow_4cor) ** 2, dim=1).sqrt()
     metrics['1px'] = (mace < 1).float().mean().item()
     metrics['3px'] = (mace < 3).float().mean().item()
     metrics['mace'] = mace.mean().item()
-    metrics['ce_loss'] = ce_loss.item()
 
     if four_ue_list is not None:
         ue_loss = 0.0

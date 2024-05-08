@@ -32,9 +32,9 @@ def main(args):
 
     if args.restore_ckpt is not None:
         save_model = torch.load(args.restore_ckpt)
-        model.netG.load_state_dict(save_model['netG'], strict=False if args.ue_mock else True)
+        model.netG.load_state_dict(save_model['netG'], strict=False)
         if save_model['netG_fine'] is not None:
-            model.netG_fine.load_state_dict(save_model['netG_fine'], strict=False if args.ue_mock else True)
+            model.netG_fine.load_state_dict(save_model['netG_fine'], strict=True)
         
     train_loader = datasets.fetch_dataloader(args, split="train")
     if os.path.exists(os.path.join(args.datasets_folder, args.dataset_name, "extended_queries.h5")):
@@ -44,10 +44,11 @@ def main(args):
 
     total_steps = 0
     last_best_val_mace = None
+    last_best_val_ue_loss = None
     while total_steps <= args.num_steps:
-        total_steps, last_best_val_mace = train(model, train_loader, args, total_steps, last_best_val_mace)
+        total_steps, last_best_val_mace = train(model, train_loader, args, total_steps, last_best_val_mace, last_best_val_ue_loss)
         if extended_loader is not None:
-            total_steps, last_best_val_mace = train(model, extended_loader, args, total_steps, last_best_val_mace, train_step_limit=len(train_loader))
+            total_steps, last_best_val_mace = train(model, extended_loader, args, total_steps, last_best_val_mace, last_best_val_ue_loss, train_step_limit=len(train_loader))
 
     test_dataset = datasets.fetch_dataloader(args, split='test')
     model_med = torch.load(args.save_dir + f'/{args.name}.pth')
@@ -56,7 +57,7 @@ def main(args):
         model.netG_fine.load_state_dict(model_med['netG_fine'], strict=False if args.ue_mock else True)
     evaluate_SNet(model, test_dataset, batch_size=args.batch_size, args=args, wandb_log=True)
 
-def train(model, train_loader, args, total_steps, last_best_val_mace, train_step_limit = None):
+def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_val_ue_loss, train_step_limit = None):
     count = 0
     if args.neg_training:
         train_loader.dataset.recompute_negatives_random(args)
@@ -111,14 +112,14 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
                 "G_loss": metrics["G_loss"],
                 "D_loss": metrics["D_loss"] if args.neg_training else 0,
                 "ue_loss": metrics["ue_loss"] if args.ue_mock else 0,
-                "ce_loss": metrics["ce_loss"],
+                "ce_loss": metrics["ce_loss"] if not args.ue_mock_freeze else 0,
                 "ue_neg_loss": metrics["ue_neg_loss"] if args.neg_training and args.ue_mock else 0,
                 "neg_loss": metrics["neg_loss"] if args.neg_training else 0,
             },)
         total_steps += 1
         # Validate
         if total_steps % args.val_freq == args.val_freq - 1:
-            current_val_mace = validate(model, args, total_steps)
+            current_val_mace, current_val_ue_loss = validate(model, args, total_steps)
             # plot_train(logger, args)
             # plot_val(logger, args)
             PATH = args.save_dir + f'/{total_steps+1}_{args.name}.pth'
@@ -127,13 +128,22 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
                 "netG_fine": model.netG_fine.state_dict() if args.two_stages else None,
             }
             torch.save(checkpoint, PATH)
-            if last_best_val_mace is None or last_best_val_mace > current_val_mace:
-                logging.info(f"Saving best model, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
-                last_best_val_mace = current_val_mace
-                PATH = args.save_dir + f'/{args.name}.pth'
-                torch.save(checkpoint, PATH)
+            if args.ue_mock and args.ue_mock_freeze:
+                if last_best_val_ue_loss is None or last_best_val_ue_loss > current_val_ue_loss:
+                    logging.info(f"Saving best model, last_best_val_ue_loss: {last_best_val_ue_loss}, current_val_ue_loss: {current_val_ue_loss}")
+                    last_best_val_ue_loss = current_val_ue_loss
+                    PATH = args.save_dir + f'/{args.name}.pth'
+                    torch.save(checkpoint, PATH)
+                else:
+                    logging.info(f"No Saving, last_best_val_ue_loss: {last_best_val_ue_loss}, current_val_ue_loss: {current_val_ue_loss}")
             else:
-                logging.info(f"No Saving, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
+                if last_best_val_mace is None or last_best_val_mace > current_val_mace:
+                    logging.info(f"Saving best model, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
+                    last_best_val_mace = current_val_mace
+                    PATH = args.save_dir + f'/{args.name}.pth'
+                    torch.save(checkpoint, PATH)
+                else:
+                    logging.info(f"No Saving, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
 
         if total_steps >= args.num_steps:
             break
@@ -149,9 +159,10 @@ def validate(model, args, total_steps):
     # Evaluate results
     results.update(validate_process(model, args, total_steps))
     wandb.log({
-                "val_mace": results['val_mace']
+                "val_mace": results['val_mace'],
+                "val_ue_loss": results['val_ue_loss']
             })
-    return results['val_mace']
+    return results['val_mace'], results['val_ue_loss']
 
 
 if __name__ == "__main__":
@@ -163,7 +174,7 @@ if __name__ == "__main__":
     f"{args.dataset_name}-{start_time.strftime('%Y-%m-%d_%H-%M-%S')}-{uuid4()}",
     )
     commons.setup_logging(args.save_dir, console='info')
-    setup_seed(0)
+    setup_seed(args.seed)
 
     wandb.init(project="UAGL", entity="xjh19971", config=vars(args))
         

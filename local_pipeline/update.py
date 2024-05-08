@@ -289,7 +289,7 @@ class CNN(nn.Module):
         return x
 
 class GMA(nn.Module):
-    def __init__(self, args, sz, first_stage):
+    def __init__(self, args, sz):
         super().__init__()
         self.args = args
 

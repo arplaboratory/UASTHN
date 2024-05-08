@@ -30,9 +30,9 @@ class IHN(nn.Module):
         self.fnet1 = BasicEncoderQuarter(output_dim=256, norm_fn='instance')
         if self.args.lev0:
             sz = self.args.resize_width // 4
-            self.update_block_4 = GMA(self.args, sz, first_stage)
-            if self.args.ue_mock:
-                self.ue_update_block_4 = GMA(self.args, sz, first_stage)
+            self.update_block_4 = GMA(self.args, sz)
+            if self.args.ue_mock and self.first_stage:
+                self.ue_update_block_4 = GMA(self.args, sz)
         self.imagenet_mean = None
         self.imagenet_std = None
 
@@ -208,7 +208,10 @@ class UAGL():
         if for_training:
             if args.two_stages:
                 if args.restore_ckpt is None or args.finetune:
-                    self.optimizer_G, self.scheduler_G = fetch_optimizer(args, list(self.netG.parameters()) + list(self.netG_fine.parameters()))
+                    if args.ue_mock_freeze:
+                        self.optimizer_G, self.scheduler_G = fetch_optimizer(args, list(self.netG.ue_update_block_4.parameters()))
+                    else:
+                        self.optimizer_G, self.scheduler_G = fetch_optimizer(args, list(self.netG.parameters()) + list(self.netG_fine.parameters()))
                 else:
                     self.optimizer_G, self.scheduler_G = fetch_optimizer(args,list(self.netG_fine.parameters()))
             else:
@@ -249,16 +252,16 @@ class UAGL():
         else:
             self.image_1_neg = None
         
-    def forward(self, for_training=False):
+    def forward(self, for_training=False, for_test=False):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         # time1 = time.time()
-        if self.args.first_stage_ue and not self.args.ue_mock:
+        if self.args.first_stage_ue and not (self.args.ue_mock and for_test):
             self.first_stage_ue_generate()
         if self.args.ue_mock:
             self.four_preds_list, self.four_pred, self.four_pred_ue_list = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
         else:
             self.four_preds_list, self.four_pred = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
-        if self.args.first_stage_ue and not self.args.ue_mock:
+        if self.args.first_stage_ue and not (self.args.ue_mock and for_test):
             # for i in range(len(self.four_preds_list)): # DEBUG
             #     self.four_preds_list[i] = self.flow_4cor # DEBUG
             # self.four_pred = self.flow_4cor # DEBUG
@@ -268,8 +271,13 @@ class UAGL():
             self.image_2_multi = self.image_2
             self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
             self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
+            if self.args.ue_mock:
+                self.std_four_pred_five_crops_gt = self.std_four_pred_five_crops
+                self.std_four_pred_five_crops = self.four_pred_ue_list[-1]
+                self.std_four_pred_five_crops = self.std_four_pred_five_crops.view(self.std_four_pred_five_crops.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)[:, 0]
         elif self.args.first_stage_ue and self.args.ue_mock:
             self.std_four_pred_five_crops = self.four_pred_ue_list[-1]
+            self.std_four_pred_five_crops = self.std_four_pred_five_crops.view(self.std_four_pred_five_crops.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)[:, 0]
         # time2 = time.time()
         # logging.debug("Time for 1st forward pass: " + str(time2 - time1) + " seconds")
         if self.args.two_stages:
@@ -287,8 +295,6 @@ class UAGL():
             # logging.debug("Time for 2nd forward pass: " + str(time2 - time1) + " seconds")
             # self.four_pred_fine = torch.zeros_like(self.four_pred).to(self.four_pred.device) # DEBUG
             # self.four_preds_list_fine[-1] = self.four_pred_fine # DEBUG
-            self.four_preds_list_first_stage = self.four_preds_list
-            self.four_pred_first_stage = self.four_pred
             self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox, for_training)
         self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
 

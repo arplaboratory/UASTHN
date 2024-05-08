@@ -16,14 +16,13 @@ import datasets_4cor_img as datasets
 from utils import save_overlap_img
 import logging
 
-@torch.no_grad()
 def validate_process(model, args, total_steps):
     """ Perform evaluation on the FlyingChairs (test) split """
     model.netG.eval()
     if args.two_stages:
         model.netG_fine.eval()
     mace_list = []
-    mace_conf_list = []
+    ue_loss_list =[]
     val_loader = datasets.fetch_dataloader(args, split='val')
     for i_batch, data_blob in enumerate(tqdm(val_loader)):
             
@@ -42,7 +41,8 @@ def validate_process(model, args, total_steps):
         image1 = image1.to(model.netG.module.device)
         image2 = image2.to(model.netG.module.device)
         model.set_input(image1, image2, flow_gt)
-        model.forward()
+        with torch.no_grad():
+            model.forward()
         if i_batch == 0:
             # Visualize
             save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
@@ -58,9 +58,17 @@ def validate_process(model, args, total_steps):
         four_pr = model.four_pred
         mace = torch.sum((four_pr.cpu().detach() - flow_4cor) ** 2, dim=1).sqrt()
         mace_list.append(mace.view(-1).numpy())
+        if args.ue_mock:
+            ue_loss = (model.std_four_pred_five_crops_gt - model.std_four_pred_five_crops).abs()
+            ue_loss_list.append(ue_loss.view(-1).cpu().detach().numpy())
     model.netG.train()
     if args.two_stages:
         model.netG_fine.train()
     mace = np.mean(np.concatenate(mace_list))
     logging.info("Validation MACE: %f" % mace)
-    return {'val_mace': mace}
+    if args.ue_mock:
+        ue_loss = np.mean(np.concatenate(ue_loss_list))
+        logging.info("Validation UE LOSS: %f" % ue_loss)
+    else:
+        ue_loss = 0
+    return {'val_mace': mace, 'val_ue_loss': ue_loss}

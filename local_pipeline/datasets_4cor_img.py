@@ -47,14 +47,13 @@ class homo_dataset(data.Dataset):
         if self.augment: # EVAL
             if self.args.eval_model is not None:
                 self.rng = None
-            else:
-                self.augment_type = ["no"]
-                if self.args.perspective_max > 0:
-                    self.augment_type.append("perspective")
-                if self.args.rotate_max > 0:
-                    self.augment_type.append("rotate")
-                if self.args.resize_max > 0:
-                    self.augment_type.append("resize")
+            self.augment_type = ["no"]
+            if self.args.perspective_max > 0:
+                self.augment_type.append("perspective")
+            if self.args.rotate_max > 0:
+                self.augment_type.append("rotate")
+            if self.args.resize_max > 0:
+                self.augment_type.append("resize")
         base_transform = transforms.Compose(
             [
                 transforms.Resize([self.args.resize_width, self.args.resize_width]),

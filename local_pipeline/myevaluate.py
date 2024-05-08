@@ -31,7 +31,7 @@ def test(args, wandb_log):
         for key in list(model_med['netG'].keys()):
             if key.startswith('module'):
                 del model_med['netG'][key]
-        model.netG.load_state_dict(model_med['netG'], strict=False if args.ue_mock else True)
+        model.netG.load_state_dict(model_med['netG'], strict=True)
         if args.two_stages:
             model_med = torch.load(args.eval_model, map_location='cuda:0')
             for key in list(model_med['netG_fine'].keys()):
@@ -39,7 +39,7 @@ def test(args, wandb_log):
             for key in list(model_med['netG_fine'].keys()):
                 if key.startswith('module'):
                     del model_med['netG_fine'][key]
-            model.netG_fine.load_state_dict(model_med['netG_fine'], strict=False if args.ue_mock else True)
+            model.netG_fine.load_state_dict(model_med['netG_fine'], strict=True)
         
         model.setup() 
         model.netG.eval()
@@ -62,7 +62,6 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     total_ce = torch.empty(0)
     total_ue_mask = torch.empty(0, len(args.ue_rej_std))
     timeall=[]
-    mace_conf_list = []
     if args.generate_test_pairs:
         test_pairs = torch.zeros(len(val_dataset.dataset), dtype=torch.long)
 
@@ -85,12 +84,13 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         flow_4cor[:, :, 1, 1] = flow_gt[:, :, -1, -1]
 
         if not args.identity:
-            # time_start = time.time()
-            model.forward()
-            # time_end = time.time()
-            four_pred = model.four_pred
-            # timeall.append(time_end-time_start)
-            # print(time_end-time_start)
+            with torch.no_grad():
+                # time_start = time.time()
+                model.forward(for_test=True)
+                # time_end = time.time()
+                four_pred = model.four_pred
+                # timeall.append(time_end-time_start)
+                # print(time_end-time_start)
         else:
             four_pred = torch.zeros((flow_gt.shape[0], 2, 2, 2))
 

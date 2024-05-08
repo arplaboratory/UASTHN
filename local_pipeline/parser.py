@@ -2,6 +2,7 @@ import argparse
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--seed', default=0, type=int)
     parser.add_argument('--name', default='UAGL', help="name your experiment")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--gpuid', type=int, nargs='+', default=[0])
@@ -58,6 +59,7 @@ def parse_arguments():
     parser.add_argument('--ue_rej_std', type=float, nargs='+', default=[2.0, 4.0, 8.0, 16.0])
     parser.add_argument('--ue_maj_vote_rej', type=float, default=16.0)
     parser.add_argument('--ue_mock', action="store_true")
+    parser.add_argument('--ue_mock_freeze', action="store_true")
     parser.add_argument("--ue_mock_loss_lambda", type=float, default=1.0, help="G_loss_lambda only for homo")
     parser.add_argument("--ue_mock_neg_loss_lambda", type=float, default=1.0, help="G_loss_lambda only for homo")
     parser.add_argument("--ue_seed", type=int, default=0)
