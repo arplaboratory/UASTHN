@@ -49,6 +49,8 @@ def parse_arguments():
     parser.add_argument('--multi_aug_eval', action="store_true")
     parser.add_argument("--exclude_val_region",action="store_true")
     parser.add_argument('--first_stage_ue', action="store_true")
+    parser.add_argument('--ue_method', type=str, default="augment", choices=["augment", "ensemble"])
+    parser.add_argument('--ue_ensemble_load_models', type=str, default="./local_pipeline/ensemble.txt")
     parser.add_argument('--ue_shift', type=int, default=64)
     parser.add_argument('--ue_num_crops', type=int, default=5)
     parser.add_argument('--ue_shift_crops_types', type=str, default="grid", choices=["grid", "random", "random_relax", "grid_relax"])

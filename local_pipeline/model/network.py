@@ -192,7 +192,15 @@ class UAGL():
         self.four_point_org_large_single[:, :, 0, 1] = torch.Tensor([self.args.database_size - 1, 0]).to(self.device)
         self.four_point_org_large_single[:, :, 1, 0] = torch.Tensor([0, self.args.database_size - 1]).to(self.device)
         self.four_point_org_large_single[:, :, 1, 1] = torch.Tensor([self.args.database_size - 1, self.args.database_size - 1]).to(self.device) # Only to calculate flow so no -1
-        self.netG = arch_list[args.arch](args, True)
+        if self.args.first_stage_ue and self.args.ue_method == "ensemble":
+            self.ensemble_model_names = open(args.ue_ensemble_load_models, "r").readlines()
+            for i in range(len(self.ensemble_model_names)):
+                self.ensemble_model_names[i] = self.ensemble_model_names[i].strip()
+            self.netG_list = [arch_list[args.arch](args, False) for i in range(len(self.ensemble_model_names))]
+            if self.args.ue_mock:
+                self.netG = arch_list[args.arch](args, True)
+        else:
+            self.netG = arch_list[args.arch](args, True)
         self.shift_flow_bbox = None
         if args.two_stages:
             corr_level = args.corr_level
@@ -220,7 +228,13 @@ class UAGL():
     def setup(self):
         if hasattr(self, 'netD'):
             self.netD = self.init_net(self.netD)
-        self.netG = self.init_net(self.netG)
+        if self.args.first_stage_ue and self.args.ue_method == "ensemble":
+            for i in range(len(self.netG_list)):
+                self.netG_list[i] = self.init_net(self.netG_list[i])
+            if self.args.ue_mock:
+                self.netG = self.init_net(self.netG)
+        else:
+            self.netG = self.init_net(self.netG)
         if hasattr(self, 'netG_fine'):
             self.netG_fine = self.init_net(self.netG_fine)
 
@@ -256,21 +270,42 @@ class UAGL():
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         # time1 = time.time()
         if self.args.first_stage_ue and not (self.args.ue_mock and for_test):
-            self.first_stage_ue_generate()
+            if self.args.ue_method == "augment":
+                self.first_stage_ue_generate()
         if self.args.ue_mock:
-            self.four_preds_list, self.four_pred, self.four_pred_ue_list = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
+            if self.args.first_stage_ue and self.args.ue_method == "ensemble":
+                four_preds_list_ensemble = []
+                four_pred_ensemble = []
+                for netG in self.netG_list:
+                    four_preds_list, four_pred = netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
+                    four_preds_list_ensemble.append(four_preds_list)
+                    four_pred_ensemble.append(four_pred)
+                self.four_preds_list, self.four_pred = self.stack_ensemble_results(four_preds_list_ensemble, four_pred_ensemble)
+                _, _, self.four_pred_ue_list = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
+            else:
+                self.four_preds_list, self.four_pred, self.four_pred_ue_list = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
         else:
-            self.four_preds_list, self.four_pred = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
+            if self.args.first_stage_ue and self.args.ue_method == "ensemble":
+                four_preds_list_ensemble = []
+                four_pred_ensemble = []
+                for netG in self.netG_list:
+                    four_preds_list, four_pred = netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
+                    four_preds_list_ensemble.append(four_preds_list)
+                    four_pred_ensemble.append(four_pred)
+                self.four_preds_list, self.four_pred = self.stack_ensemble_results(four_preds_list_ensemble, four_pred_ensemble)
+            else:
+                self.four_preds_list, self.four_pred = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
         if self.args.first_stage_ue and not (self.args.ue_mock and for_test):
             # for i in range(len(self.four_preds_list)): # DEBUG
             #     self.four_preds_list[i] = self.flow_4cor # DEBUG
             # self.four_pred = self.flow_4cor # DEBUG
             self.four_preds_list, self.four_pred = self.first_stage_ue_aggregation(self.four_preds_list, self.four_pred, for_training)
-            B5, C, H, W = self.image_2.shape
-            self.image_1_multi = self.image_1
-            self.image_2_multi = self.image_2
-            self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
-            self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
+            if self.args.ue_method == "augment":
+                B5, C, H, W = self.image_2.shape
+                self.image_1_multi = self.image_1
+                self.image_2_multi = self.image_2
+                self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
+                self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
             if self.args.ue_mock:
                 self.std_four_pred_five_crops_gt = self.std_four_pred_five_crops
                 self.std_four_pred_five_crops = self.four_pred_ue_list[-1]
@@ -295,7 +330,11 @@ class UAGL():
             # logging.debug("Time for 2nd forward pass: " + str(time2 - time1) + " seconds")
             # self.four_pred_fine = torch.zeros_like(self.four_pred).to(self.four_pred.device) # DEBUG
             # self.four_preds_list_fine[-1] = self.four_pred_fine # DEBUG
+            # print(self.four_pred[0])
+            # print(self.four_pred_fine[0])
             self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox, for_training)
+            # print(self.four_pred[0])
+            # raise KeyError()
         self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
 
     def forward_neg(self, for_training=False):
@@ -312,9 +351,10 @@ class UAGL():
             #     self.four_preds_list[i] = self.flow_4cor # DEBUG
             # self.four_pred = self.flow_4cor # DEBUG
             _, _ = self.first_stage_ue_aggregation(four_preds_list_neg, four_pred_neg, for_training, neg_forward=True)
-            B5, C, H, W = self.image_2.shape
-            self.image_1_neg = self.image_1_neg.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
-            self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
+            if self.args.ue_method == "augment":
+                B5, C, H, W = self.image_2.shape
+                self.image_1_neg = self.image_1_neg.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
+                self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
 
     def get_cropped_st_images(self, image_1_ori, four_pred, fine_padding, detach=True, augment_two_stages=0):
         # From four_pred to bbox coordinates
@@ -469,14 +509,18 @@ class UAGL():
         return bbox_s
 
     def ue_aggregation(self, four_preds_list, alpha, for_training, check_step=-1):
-        if self.args.ue_aug_method == "shift":
-            # Recover shift
-            four_preds_recovered_list = []
-            for i in range(len(four_preds_list)):
-                four_preds_recovered_list.append(four_preds_list[i] - self.normed_shift_flow_bbox)
-            four_preds_list = four_preds_recovered_list
+        if self.args.ue_method == "augment":
+            if self.args.ue_aug_method == "shift":
+                # Recover shift
+                four_preds_recovered_list = []
+                for i in range(len(four_preds_list)):
+                    four_preds_recovered_list.append(four_preds_list[i] - self.normed_shift_flow_bbox)
+                four_preds_list = four_preds_recovered_list
         four_pred = four_preds_list[check_step]
-        four_pred_five_crops = four_pred.view(four_pred.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
+        if self.args.ue_method == "ensemble":
+            four_pred_five_crops = four_pred.view(four_pred.shape[0]//len(self.netG_list), len(self.netG_list), 2, 2, 2)
+        elif self.args.ue_method == "augment":
+            four_pred_five_crops = four_pred.view(four_pred.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
         std_four_pred_five_crops = torch.std(four_pred_five_crops, dim=1)
         mean_four_pred_five_crops = torch.mean(four_pred_five_crops, dim=1)
         resize_maj_vote_rej = self.args.ue_maj_vote_rej
@@ -499,13 +543,27 @@ class UAGL():
         four_preds_list_new = []
         four_preds_std_list_new = []
         for i in range(len(four_preds_list)):
-            four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
+            if self.args.ue_method == "ensemble":
+                four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//len(self.netG_list), len(self.netG_list), 2, 2, 2)
+            elif self.args.ue_method == "augment":
+                four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
             # Mean for training
             std_four_pred_single = torch.std(four_pred_single, dim=1)
             mean_four_pred_single = torch.mean(four_pred_single, dim=1)
             four_preds_list_new.append(mean_four_pred_single)
             four_preds_std_list_new.append(std_four_pred_single)
         return four_preds_list_new, four_pred_new, four_preds_std_list_new, std_four_pred_five_crops
+
+    def stack_ensemble_results(self, four_preds_list_ensemble, four_pred_ensemble):
+        four_preds_list = []
+        for i in range(len(four_preds_list_ensemble[0])):
+            four_preds_list_single = []
+            for j in range(len(four_preds_list_ensemble)):
+                four_preds_list_single.append(four_preds_list_ensemble[j][i]) # batch size
+            four_preds_list_single = torch.stack(four_preds_list_single, dim=1).view(-1, 2, 2, 2)
+            four_preds_list.append(four_preds_list_single)
+        four_pred = torch.stack(four_pred_ensemble, dim=1).view(-1, 2, 2, 2)
+        return four_preds_list, four_pred
 
     def backward_G(self):
         """Calculate GAN and L1 loss for the generator"""

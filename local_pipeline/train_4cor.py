@@ -32,7 +32,14 @@ def main(args):
 
     if args.restore_ckpt is not None:
         save_model = torch.load(args.restore_ckpt)
-        model.netG.load_state_dict(save_model['netG'], strict=False)
+        if args.first_stage_ue and args.ue_method == "ensemble":
+            for i in range(len(model.ensemble_model_names)):
+                save_model_ensemble = torch.load(model.ensemble_model_names[i])
+                model.netG_list[i].load_state_dict(save_model_ensemble['netG'], strict=True)
+            if args.ue_mock:
+                model.netG.load_state_dict(save_model['netG'], strict=False)
+        else:
+            model.netG.load_state_dict(save_model['netG'], strict=False)
         if save_model['netG_fine'] is not None:
             model.netG_fine.load_state_dict(save_model['netG_fine'], strict=True)
         

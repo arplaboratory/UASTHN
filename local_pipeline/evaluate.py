@@ -18,6 +18,9 @@ import logging
 
 def validate_process(model, args, total_steps):
     """ Perform evaluation on the FlyingChairs (test) split """
+    if args.first_stage_ue and args.ue_method == "ensemble":
+        for i in range(len(model.netG_list)):
+            model.netG_list[i].eval()
     model.netG.eval()
     if args.two_stages:
         model.netG_fine.eval()
@@ -61,6 +64,9 @@ def validate_process(model, args, total_steps):
         if args.ue_mock:
             ue_loss = (model.std_four_pred_five_crops_gt - model.std_four_pred_five_crops).abs()
             ue_loss_list.append(ue_loss.view(-1).cpu().detach().numpy())
+    if args.first_stage_ue and args.ue_method == "ensemble":
+        for i in range(len(model.netG_list)):
+            model.netG_list[i].train()
     model.netG.train()
     if args.two_stages:
         model.netG_fine.train()

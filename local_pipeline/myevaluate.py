@@ -25,13 +25,31 @@ import wandb
 def test(args, wandb_log):
     if not args.identity:
         model = UAGL(args)
-        model_med = torch.load(args.eval_model, map_location='cuda:0')
-        for key in list(model_med['netG'].keys()):
-            model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
-        for key in list(model_med['netG'].keys()):
-            if key.startswith('module'):
-                del model_med['netG'][key]
-        model.netG.load_state_dict(model_med['netG'], strict=True)
+        if args.first_stage_ue and args.ue_method == "ensemble":
+            for i in range(len(model.ensemble_model_names)):
+                model_med = torch.load(model.ensemble_model_names[i], map_location='cuda:0')
+                for key in list(model_med['netG'].keys()):
+                    model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
+                for key in list(model_med['netG'].keys()):
+                    if key.startswith('module'):
+                        del model_med['netG'][key]
+                model.netG_list[i].load_state_dict(model_med['netG'], strict=True)
+            if args.ue_mock:
+                model_med = torch.load(args.eval_model, map_location='cuda:0')
+                for key in list(model_med['netG'].keys()):
+                    model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
+                for key in list(model_med['netG'].keys()):
+                    if key.startswith('module'):
+                        del model_med['netG'][key]
+                model.netG.load_state_dict(model_med['netG'], strict=True)
+        else:
+            model_med = torch.load(args.eval_model, map_location='cuda:0')
+            for key in list(model_med['netG'].keys()):
+                model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
+            for key in list(model_med['netG'].keys()):
+                if key.startswith('module'):
+                    del model_med['netG'][key]
+            model.netG.load_state_dict(model_med['netG'], strict=True)
         if args.two_stages:
             model_med = torch.load(args.eval_model, map_location='cuda:0')
             for key in list(model_med['netG_fine'].keys()):
@@ -42,7 +60,13 @@ def test(args, wandb_log):
             model.netG_fine.load_state_dict(model_med['netG_fine'], strict=True)
         
         model.setup() 
-        model.netG.eval()
+        if args.first_stage_ue and args.ue_method == "ensemble":
+            for i in range(len(model.netG_list)):
+                model.netG_list[i].eval()
+            if args.ue_mock:
+                model.netG.eval()
+        else:
+            model.netG.eval()
         if args.two_stages:
             model.netG_fine.eval()
     else:
