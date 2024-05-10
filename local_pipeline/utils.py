@@ -176,7 +176,12 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None, 
         ue_loss = 0.0
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
-            i4cor_loss = (four_ue_list[i].view(-1, args.ue_num_crops, 2, 2, 2)[:, 0] - four_ue_gt_list[i]).abs()
+            if args.ue_method == "augment":
+                i4cor_loss = (four_ue_list[i].view(-1, args.ue_num_crops, 2, 2, 2)[:, 0] - four_ue_gt_list[i]).abs()
+            elif args.ue_method == "ensemble":
+                i4cor_loss = (four_ue_list[i] - four_ue_gt_list[i]).abs()
+            else:
+                raise NotImplementedError()
             ue_loss += i_weight * (i4cor_loss).mean()
         ce_loss += args.ue_mock_loss_lambda * ue_loss
         metrics['ue_loss'] = ue_loss.item()

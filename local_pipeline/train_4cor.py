@@ -80,8 +80,9 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
         if i_batch==0:
             save_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1.png')
             if args.first_stage_ue:
-                save_img(torchvision.utils.make_grid(model.image_1_multi, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_multi.png')
-                save_img(torchvision.utils.make_grid(model.image_2_multi, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_multi.png')
+                if args.ue_method == "augment":
+                    save_img(torchvision.utils.make_grid(model.image_1_multi, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_multi.png')
+                    save_img(torchvision.utils.make_grid(model.image_2_multi, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_multi.png')
             if args.neg_training:
                 save_img(torchvision.utils.make_grid(model.image_1_neg, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_neg.png')
             save_img(torchvision.utils.make_grid(model.image_2, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2.png')

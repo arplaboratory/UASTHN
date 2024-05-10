@@ -309,7 +309,10 @@ class UAGL():
             if self.args.ue_mock:
                 self.std_four_pred_five_crops_gt = self.std_four_pred_five_crops
                 self.std_four_pred_five_crops = self.four_pred_ue_list[-1]
-                self.std_four_pred_five_crops = self.std_four_pred_five_crops.view(self.std_four_pred_five_crops.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)[:, 0]
+                if self.args.ue_method == "augment":
+                    self.std_four_pred_five_crops = self.std_four_pred_five_crops.view(self.std_four_pred_five_crops.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)[:, 0]
+                elif self.args.ue_method == "ensemble":
+                    self.std_four_pred_five_crops = self.std_four_pred_five_crops
         elif self.args.first_stage_ue and self.args.ue_mock:
             self.std_four_pred_five_crops = self.four_pred_ue_list[-1]
             self.std_four_pred_five_crops = self.std_four_pred_five_crops.view(self.std_four_pred_five_crops.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)[:, 0]
