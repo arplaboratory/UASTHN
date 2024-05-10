@@ -26,7 +26,7 @@ def test(args, wandb_log):
     if not args.identity:
         model = UAGL(args)
         if args.first_stage_ue and args.ue_method == "ensemble":
-            for i in range(len(model.ensemble_model_names)):
+            for i in range(len(model.netG_list)):
                 model_med = torch.load(model.ensemble_model_names[i], map_location='cuda:0')
                 for key in list(model_med['netG'].keys()):
                     model_med['netG'][key.replace('module.','')] = model_med['netG'][key]

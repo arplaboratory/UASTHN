@@ -193,10 +193,12 @@ class UAGL():
         self.four_point_org_large_single[:, :, 1, 0] = torch.Tensor([0, self.args.database_size - 1]).to(self.device)
         self.four_point_org_large_single[:, :, 1, 1] = torch.Tensor([self.args.database_size - 1, self.args.database_size - 1]).to(self.device) # Only to calculate flow so no -1
         if self.args.first_stage_ue and self.args.ue_method == "ensemble":
-            self.ensemble_model_names = open(args.ue_ensemble_load_models, "r").readlines()
-            for i in range(len(self.ensemble_model_names)):
-                self.ensemble_model_names[i] = self.ensemble_model_names[i].strip()
-            self.netG_list = [arch_list[args.arch](args, False) for i in range(len(self.ensemble_model_names))]
+            self.ensemble_model_names_raw = open(args.ue_ensemble_load_models, "r").readlines()
+            self.ensemble_model_names = []
+            assert self.args.ue_num_crops <= len(self.ensemble_model_names_raw)
+            for i in range(self.args.ue_num_crops):
+                self.ensemble_model_names.append(self.ensemble_model_names_raw[i].strip())
+            self.netG_list = [arch_list[args.arch](args, False) for i in range(self.args.ue_num_crops)]
             if self.args.ue_mock:
                 self.netG = arch_list[args.arch](args, True)
         else:
