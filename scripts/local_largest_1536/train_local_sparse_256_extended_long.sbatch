@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=8               # uses 1 compute core per task
 #SBATCH --time=36:00:00
 #SBATCH --gres=gpu:a100:1
-#SBATCH --mem=200GB
+#SBATCH --mem=250GB
 #SBATCH --job-name=train_local
 #SBATCH --output=train_local.out
 
