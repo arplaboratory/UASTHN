@@ -320,7 +320,7 @@ class UAGL():
             self.std_four_pred_five_crops = self.std_four_pred_five_crops.view(self.std_four_pred_five_crops.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)[:, 0]
         # time2 = time.time()
         # logging.debug("Time for 1st forward pass: " + str(time2 - time1) + " seconds")
-        if self.args.two_stages:
+        if self.args.two_stages and not (self.args.ue_mock_freeze and for_training):
             # self.four_pred = self.flow_4cor # DEBUG
             # self.four_preds_list[-1] = self.four_pred # DEBUG
             # self.four_preds_list[-1] = torch.zeros_like(self.four_pred).to(self.four_pred.device) # DEBUG
@@ -447,10 +447,10 @@ class UAGL():
         alpha = self.args.database_size / self.args.resize_width
         if not neg_forward:
             four_preds_list, four_pred, self.std_four_preds_list, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
-            print("Positve UE std: " + str((self.std_four_pred_five_crops).max()))
+            print("Positve UE std: " + str((self.std_four_pred_five_crops[0])))
         else:
             four_preds_list, four_pred, self.std_four_preds_neg_list, self.std_four_pred_five_crops_neg = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
-            print("Negative UE std: " + str((self.std_four_pred_five_crops_neg).min()))
+            print("Negative UE std: " + str((self.std_four_pred_five_crops_neg[0])))
         return four_preds_list, four_pred
 
     def first_stage_ue_generate_bbox(self):
@@ -458,11 +458,8 @@ class UAGL():
         resized_ue_shift = self.args.ue_shift / beta
         x_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
         y_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
-        if self.args.ue_shift_crops_types == "grid" or self.args.ue_shift_crops_types == "grid_relax":
-            if self.args.ue_shift_crops_types == "grid_relax":
-                resized_ue_shift_sample = int(self.ue_rng.integers(1, 2*resized_ue_shift))
-            else:
-                resized_ue_shift_sample = resized_ue_shift
+        if self.args.ue_shift_crops_types == "grid":
+            resized_ue_shift_sample = resized_ue_shift
             if self.args.ue_num_crops == 2:
                 x_shift_grid = np.array(resized_ue_shift_sample / 2) # 1 -> 1 2-4 -> 4 5-9 -> 9    
                 y_shift_grid = np.array(resized_ue_shift_sample / 2)
@@ -493,14 +490,6 @@ class UAGL():
             x_shift = torch.tensor([0] + x_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
             y_shift = torch.tensor([0] + y_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
             w = torch.tensor([self.args.resize_width] + w_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
-        elif self.args.ue_shift_crops_types == "random_relax":
-            resized_ue_shift_list = [int(self.ue_rng.integers(1, 2*resized_ue_shift)) for i in range(self.args.ue_num_crops - 1)]
-            x_shift_random = [int(self.ue_rng.integers(0, resized_ue_shift_list[i])) for i in range(self.args.ue_num_crops - 1)]
-            y_shift_random = [int(self.ue_rng.integers(0, resized_ue_shift_list[i])) for i in range(self.args.ue_num_crops - 1)]
-            w_random = [self.args.resize_width - resized_ue_shift_list[i] for i in range(self.args.ue_num_crops - 1)]
-            x_shift = torch.tensor([0] + x_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device) # on 256x256
-            y_shift = torch.tensor([0] + y_shift_random).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
-            w = torch.tensor([self.args.resize_width] + w_random, dtype=torch.float).repeat(self.image_2.shape[0]//self.args.ue_num_crops).to(self.image_2.device)
         else:
             raise NotImplementedError()
         x_start += x_shift

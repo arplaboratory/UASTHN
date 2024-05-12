@@ -93,7 +93,7 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
             save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
                             torchvision.utils.make_grid(model.fake_warped_image_2, nrow=16, padding = 16, pad_value=0),
                             args.save_dir + f'/train_overlap_pred.png')
-            if args.two_stages:
+            if args.two_stages and not args.ue_mock_freeze:
                 save_img(torchvision.utils.make_grid(model.image_1_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_crop.png')
                 save_img(torchvision.utils.make_grid(model.image_2_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_crop.png')
         model.update_learning_rate()
