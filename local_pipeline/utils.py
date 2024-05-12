@@ -158,7 +158,7 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None):
         assert four_ue_list is not None
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
-            i4cor_loss = (four_preds[i] - flow_4cor)*torch.exp(-four_ue_list[i])/2 + four_ue_list[i]/2
+            i4cor_loss = (four_preds[i] - flow_4cor)**2*torch.exp(-four_ue_list[i])/2 + four_ue_list[i]/2
             ce_loss += i_weight * (i4cor_loss).mean()
     else:
         for i in range(args.iters_lev0):
