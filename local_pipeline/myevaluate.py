@@ -34,14 +34,6 @@ def test(args, wandb_log):
                     if key.startswith('module'):
                         del model_med['netG'][key]
                 model.netG_list[i].load_state_dict(model_med['netG'], strict=True)
-            if args.ue_mock:
-                model_med = torch.load(args.eval_model, map_location='cuda:0')
-                for key in list(model_med['netG'].keys()):
-                    model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
-                for key in list(model_med['netG'].keys()):
-                    if key.startswith('module'):
-                        del model_med['netG'][key]
-                model.netG.load_state_dict(model_med['netG'], strict=True)
         else:
             model_med = torch.load(args.eval_model, map_location='cuda:0')
             for key in list(model_med['netG'].keys()):
@@ -63,8 +55,6 @@ def test(args, wandb_log):
         if args.first_stage_ue and args.ue_method == "ensemble":
             for i in range(len(model.netG_list)):
                 model.netG_list[i].eval()
-            if args.ue_mock:
-                model.netG.eval()
         else:
             model.netG.eval()
         if args.two_stages:
@@ -110,7 +100,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         if not args.identity:
             with torch.no_grad():
                 # time_start = time.time()
-                model.forward(for_test=True)
+                model.forward(for_test=False)
                 # time_end = time.time()
                 four_pred = model.four_pred
                 # timeall.append(time_end-time_start)

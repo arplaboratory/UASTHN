@@ -25,7 +25,6 @@ def validate_process(model, args, total_steps):
     if args.two_stages:
         model.netG_fine.eval()
     mace_list = []
-    ue_loss_list =[]
     val_loader = datasets.fetch_dataloader(args, split='val')
     for i_batch, data_blob in enumerate(tqdm(val_loader)):
             
@@ -61,9 +60,6 @@ def validate_process(model, args, total_steps):
         four_pr = model.four_pred
         mace = torch.sum((four_pr.cpu().detach() - flow_4cor) ** 2, dim=1).sqrt()
         mace_list.append(mace.view(-1).numpy())
-        if args.ue_mock:
-            ue_loss = (model.std_four_pred_five_crops_gt - model.std_four_pred_five_crops).abs()
-            ue_loss_list.append(ue_loss.view(-1).cpu().detach().numpy())
     if args.first_stage_ue and args.ue_method == "ensemble":
         for i in range(len(model.netG_list)):
             model.netG_list[i].train()
@@ -72,9 +68,4 @@ def validate_process(model, args, total_steps):
         model.netG_fine.train()
     mace = np.mean(np.concatenate(mace_list))
     logging.info("Validation MACE: %f" % mace)
-    if args.ue_mock:
-        ue_loss = np.mean(np.concatenate(ue_loss_list))
-        logging.info("Validation UE LOSS: %f" % ue_loss)
-    else:
-        ue_loss = 0
-    return {'val_mace': mace, 'val_ue_loss': ue_loss}
+    return {'val_mace': mace}

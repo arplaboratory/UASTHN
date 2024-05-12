@@ -31,7 +31,7 @@ class IHN(nn.Module):
         if self.args.lev0:
             sz = self.args.resize_width // 4
             self.update_block_4 = GMA(self.args, sz)
-            if self.args.ue_mock and self.first_stage:
+            if self.args.ue_method == "single" and self.first_stage:
                 self.ue_update_block_4 = GMA(self.args, sz)
         self.imagenet_mean = None
         self.imagenet_std = None
@@ -134,7 +134,7 @@ class IHN(nn.Module):
         self.sz = sz
         four_point_disp = torch.zeros((sz[0], 2, 2, 2)).to(fmap1.device)
         four_point_predictions = []
-        if self.args.ue_mock and self.first_stage:
+        if self.args.ue_method == "single" and self.first_stage:
             four_point_ues = []
         # time1 = time.time()
         for itr in range(iters_lev0):
@@ -146,7 +146,7 @@ class IHN(nn.Module):
                     delta_four_point, weight = self.update_block_4(corr, flow)
                 else:
                     delta_four_point = self.update_block_4(corr, flow)
-                    if self.args.ue_mock and self.first_stage:
+                    if self.args.ue_method == "single" and self.first_stage:
                         ue_four_point = self.ue_update_block_4(corr, flow)
                     
             try:
@@ -154,7 +154,7 @@ class IHN(nn.Module):
                 four_point_disp =  four_point_disp + delta_four_point[:, :2]
                 coords1 = self.get_flow_now_4(four_point_disp) # Possible error: Unsolvable H
                 four_point_predictions.append(four_point_disp)
-                if self.args.ue_mock and self.first_stage:
+                if self.args.ue_method == "single" and self.first_stage:
                     four_point_ues.append(ue_four_point)
             except Exception as e:
                 logging.debug(e)
@@ -162,12 +162,12 @@ class IHN(nn.Module):
                 four_point_disp = last_four_point_disp
                 coords1 = self.get_flow_now_4(four_point_disp) # Possible error: Unsolvable H
                 four_point_predictions.append(four_point_disp)
-                if self.args.ue_mock and self.first_stage:
+                if self.args.ue_method == "single" and self.first_stage:
                     four_point_ues.append(ue_four_point)
         # time2 = time.time()
         # print("Time for iterative: " + str(time2 - time1) + " seconds") # 0.12
 
-        if self.args.ue_mock and self.first_stage:
+        if self.args.ue_method == "single" and self.first_stage:
             return four_point_predictions, four_point_disp, four_point_ues
         else:
             return four_point_predictions, four_point_disp
@@ -199,8 +199,6 @@ class UAGL():
             for i in range(self.args.ue_num_crops):
                 self.ensemble_model_names.append(self.ensemble_model_names_raw[i].strip())
             self.netG_list = [arch_list[args.arch](args, False) for i in range(self.args.ue_num_crops)]
-            if self.args.ue_mock:
-                self.netG = arch_list[args.arch](args, True)
         else:
             self.netG = arch_list[args.arch](args, True)
         self.shift_flow_bbox = None
@@ -218,10 +216,7 @@ class UAGL():
         if for_training:
             if args.two_stages:
                 if args.restore_ckpt is None or args.finetune:
-                    if args.ue_mock_freeze:
-                        self.optimizer_G, self.scheduler_G = fetch_optimizer(args, list(self.netG.ue_update_block_4.parameters()))
-                    else:
-                        self.optimizer_G, self.scheduler_G = fetch_optimizer(args, list(self.netG.parameters()) + list(self.netG_fine.parameters()))
+                    self.optimizer_G, self.scheduler_G = fetch_optimizer(args, list(self.netG.parameters()) + list(self.netG_fine.parameters()))
                 else:
                     self.optimizer_G, self.scheduler_G = fetch_optimizer(args,list(self.netG_fine.parameters()))
             else:
@@ -233,8 +228,6 @@ class UAGL():
         if self.args.first_stage_ue and self.args.ue_method == "ensemble":
             for i in range(len(self.netG_list)):
                 self.netG_list[i] = self.init_net(self.netG_list[i])
-            if self.args.ue_mock:
-                self.netG = self.init_net(self.netG)
         else:
             self.netG = self.init_net(self.netG)
         if hasattr(self, 'netG_fine'):
@@ -271,11 +264,10 @@ class UAGL():
     def forward(self, for_training=False, for_test=False):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         # time1 = time.time()
-        if self.args.first_stage_ue and not (self.args.ue_mock and for_test):
-            if self.args.ue_method == "augment":
-                self.first_stage_ue_generate()
-        if self.args.ue_mock:
-            if self.args.first_stage_ue and self.args.ue_method == "ensemble":
+        if self.args.first_stage_ue and self.args.ue_method == "augment":
+            self.first_stage_ue_generate()
+        if self.args.first_stage_ue:
+            if self.args.ue_method == "ensemble":
                 four_preds_list_ensemble = []
                 four_pred_ensemble = []
                 for netG in self.netG_list:
@@ -283,44 +275,29 @@ class UAGL():
                     four_preds_list_ensemble.append(four_preds_list)
                     four_pred_ensemble.append(four_pred)
                 self.four_preds_list, self.four_pred = self.stack_ensemble_results(four_preds_list_ensemble, four_pred_ensemble)
-                _, _, self.four_pred_ue_list = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
-            else:
+            elif self.args.ue_method == "single":
                 self.four_preds_list, self.four_pred, self.four_pred_ue_list = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
-        else:
-            if self.args.first_stage_ue and self.args.ue_method == "ensemble":
-                four_preds_list_ensemble = []
-                four_pred_ensemble = []
-                for netG in self.netG_list:
-                    four_preds_list, four_pred = netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
-                    four_preds_list_ensemble.append(four_preds_list)
-                    four_pred_ensemble.append(four_pred)
-                self.four_preds_list, self.four_pred = self.stack_ensemble_results(four_preds_list_ensemble, four_pred_ensemble)
             else:
                 self.four_preds_list, self.four_pred = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
-        if self.args.first_stage_ue and not (self.args.ue_mock and for_test):
+        else:
+            self.four_preds_list, self.four_pred = self.netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
+        if self.args.first_stage_ue:
             # for i in range(len(self.four_preds_list)): # DEBUG
             #     self.four_preds_list[i] = self.flow_4cor # DEBUG
             # self.four_pred = self.flow_4cor # DEBUG
-            self.four_preds_list, self.four_pred = self.first_stage_ue_aggregation(self.four_preds_list, self.four_pred, for_training)
+            if self.args.ue_method != "single":
+                self.four_preds_list, self.four_pred = self.first_stage_ue_aggregation(self.four_preds_list, self.four_pred, for_training)
             if self.args.ue_method == "augment":
                 B5, C, H, W = self.image_2.shape
                 self.image_1_multi = self.image_1
                 self.image_2_multi = self.image_2
                 self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
                 self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
-            if self.args.ue_mock:
-                self.std_four_pred_five_crops_gt = self.std_four_pred_five_crops
-                self.std_four_pred_five_crops = self.four_pred_ue_list[-1]
-                if self.args.ue_method == "augment":
-                    self.std_four_pred_five_crops = self.std_four_pred_five_crops.view(self.std_four_pred_five_crops.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)[:, 0]
-                elif self.args.ue_method == "ensemble":
-                    self.std_four_pred_five_crops = self.std_four_pred_five_crops
-        elif self.args.first_stage_ue and self.args.ue_mock:
-            self.std_four_pred_five_crops = self.four_pred_ue_list[-1]
-            self.std_four_pred_five_crops = self.std_four_pred_five_crops.view(self.std_four_pred_five_crops.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)[:, 0]
+            elif self.args.ue_method == "single":
+                self.std_four_pred_five_crops = torch.sqrt(torch.exp(self.four_pred_ue_list[-1]))
         # time2 = time.time()
         # logging.debug("Time for 1st forward pass: " + str(time2 - time1) + " seconds")
-        if self.args.two_stages and not (self.args.ue_mock_freeze and for_training):
+        if self.args.two_stages:
             # self.four_pred = self.flow_4cor # DEBUG
             # self.four_preds_list[-1] = self.four_pred # DEBUG
             # self.four_preds_list[-1] = torch.zeros_like(self.four_pred).to(self.four_pred.device) # DEBUG
@@ -345,9 +322,9 @@ class UAGL():
     def forward_neg(self, for_training=False):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         # time1 = time.time()
-        if self.args.first_stage_ue:
+        if self.args.first_stage_ue and self.args.ue_method == "augment":
             self.first_stage_ue_generate(neg_forward=True)
-        if self.args.ue_mock:
+        if self.args.first_stage_ue and self.args.ue_method == "single":
             four_preds_list_neg, four_pred_neg, self.four_pred_ue_neg_list = self.netG(image1=self.image_1_neg, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
         else:
             four_preds_list_neg, four_pred_neg = self.netG(image1=self.image_1_neg, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
@@ -355,7 +332,8 @@ class UAGL():
             # for i in range(len(self.four_preds_list)): # DEBUG
             #     self.four_preds_list[i] = self.flow_4cor # DEBUG
             # self.four_pred = self.flow_4cor # DEBUG
-            _, _ = self.first_stage_ue_aggregation(four_preds_list_neg, four_pred_neg, for_training, neg_forward=True)
+            if self.args.ue_method != "single":
+                _, _ = self.first_stage_ue_aggregation(four_preds_list_neg, four_pred_neg, for_training, neg_forward=True)
             if self.args.ue_method == "augment":
                 B5, C, H, W = self.image_2.shape
                 self.image_1_neg = self.image_1_neg.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
@@ -562,8 +540,8 @@ class UAGL():
     def backward_G(self):
         """Calculate GAN and L1 loss for the generator"""
         # Second, G(A) = B
-        if self.args.ue_mock:
-            self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue_list=self.four_pred_ue_list, four_ue_gt_list=self.std_four_preds_list) 
+        if self.args.ue_method == "single":
+            self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue_list=self.four_pred_ue_list) 
         else:
             self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics) 
         # combine loss and calculate gradients
@@ -574,8 +552,8 @@ class UAGL():
     def backward_D(self):
         """Calculate GAN and L1 loss for the generator"""
         # Second, G(A) = B
-        if self.args.ue_mock:
-            self.loss_D, self.metrics = self.criterionNEG(self.args.gamma, self.args, self.metrics, self.std_four_preds_neg_list, self.four_pred_ue_neg_list) 
+        if self.args.ue_method == "single":
+            self.loss_D, self.metrics = self.criterionNEG(self.args.gamma, self.args, self.metrics, self.four_pred_ue_neg_list) 
         else:
             self.loss_D, self.metrics = self.criterionNEG(self.args.gamma, self.args, self.metrics, self.std_four_preds_neg_list) 
         # combine loss and calculate gradients

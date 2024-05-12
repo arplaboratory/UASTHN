@@ -143,7 +143,7 @@ def warp(x, flo):
     return output * mask
 
 
-def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None, four_ue_gt_list=None):
+def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None):
     """ Loss function defined over sequence of flow predictions """
 
     flow_4cor = torch.zeros((four_preds[0].shape[0], 2, 2, 2)).to(four_preds[0].device)
@@ -154,42 +154,35 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None, 
 
     ce_loss = 0.0
 
-    if not args.ue_mock_freeze:
+    if args.ue_method == "single":
+        assert four_ue_list is not None
+        for i in range(args.iters_lev0):
+            i_weight = gamma ** (args.iters_lev0 - i - 1)
+            i4cor_loss = (four_preds[i] - flow_4cor)*torch.exp(-four_ue_list[i])/2 + four_ue_list[i]/2
+            ce_loss += i_weight * (i4cor_loss).mean()
+    else:
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
             i4cor_loss = (four_preds[i] - flow_4cor).abs()
             ce_loss += i_weight * (i4cor_loss).mean()
 
-        if args.two_stages:
-            for i in range(args.iters_lev0, args.iters_lev1 + args.iters_lev0):
-                i_weight = gamma ** (args.iters_lev1 + args.iters_lev0 - i - 1)
-                i4cor_loss = (four_preds[i] - flow_4cor).abs()
-                ce_loss += i_weight * (i4cor_loss).mean()
-        metrics['ce_loss'] = ce_loss.item()
+    if args.two_stages:
+        for i in range(args.iters_lev0, args.iters_lev1 + args.iters_lev0):
+            i_weight = gamma ** (args.iters_lev1 + args.iters_lev0 - i - 1)
+            i4cor_loss = (four_preds[i] - flow_4cor).abs()
+            ce_loss += i_weight * (i4cor_loss).mean()
+
+    metrics['ce_loss'] = ce_loss.item()
 
     mace = torch.sum((four_preds[-1] - flow_4cor) ** 2, dim=1).sqrt()
     metrics['1px'] = (mace < 1).float().mean().item()
     metrics['3px'] = (mace < 3).float().mean().item()
     metrics['mace'] = mace.mean().item()
 
-    if four_ue_list is not None:
-        ue_loss = 0.0
-        for i in range(args.iters_lev0):
-            i_weight = gamma ** (args.iters_lev0 - i - 1)
-            if args.ue_method == "augment":
-                i4cor_loss = (four_ue_list[i].view(-1, args.ue_num_crops, 2, 2, 2)[:, 0] - four_ue_gt_list[i]).abs()
-            elif args.ue_method == "ensemble":
-                i4cor_loss = (four_ue_list[i] - four_ue_gt_list[i]).abs()
-            else:
-                raise NotImplementedError()
-            ue_loss += i_weight * (i4cor_loss).mean()
-        ce_loss += args.ue_mock_loss_lambda * ue_loss
-        metrics['ue_loss'] = ue_loss.item()
-
     return ce_loss, metrics
 
 
-def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None, four_ue_gt_list=None):
+def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None):
     """ Loss function defined over sequence of flow predictions """
 
     flow_4cor = torch.zeros((four_preds[0].shape[0], 2, 2, 2)).to(four_preds[0].device)
@@ -217,7 +210,7 @@ def single_neg_loss(gamma, args, metrics, four_ue_list, four_ue_pred_list=None):
     neg_loss = torch.mean(F.relu(args.neg_margin - four_ue_list[0]))
     metrics['neg_loss'] = neg_loss.item()
     neg_loss = args.neg_loss_lambda * neg_loss
-    if four_ue is not None:
+    if four_ue_pred_list is not None:
         raise NotImplementedError()
 
     return neg_loss, metrics
@@ -233,13 +226,7 @@ def sequence_neg_loss(gamma, args, metrics, four_ue_list, four_ue_pred_list=None
     neg_loss = args.neg_loss_lambda * neg_loss
 
     if four_ue_pred_list is not None:
-        ue_loss = 0.0
-        for i in range(args.iters_lev0):
-            i_weight = gamma ** (args.iters_lev0 - i - 1)
-            i4cor_loss = F.relu(args.neg_margin - four_ue_pred_list[i].view(-1, args.ue_num_crops, 2, 2, 2)[:, 0])
-            ue_loss += i_weight * (i4cor_loss).mean()
-        metrics['ue_neg_loss'] = ue_loss.item()
-        neg_loss += args.ue_mock_neg_loss_lambda * ue_loss
+        raise NotImplementedError()
     
     return neg_loss, metrics
 

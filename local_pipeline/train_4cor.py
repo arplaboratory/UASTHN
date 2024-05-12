@@ -36,8 +36,6 @@ def main(args):
             for i in range(len(model.netG_list)):
                 save_model_ensemble = torch.load(model.ensemble_model_names[i])
                 model.netG_list[i].load_state_dict(save_model_ensemble['netG'], strict=True)
-            if args.ue_mock:
-                model.netG.load_state_dict(save_model['netG'], strict=False)
         else:
             model.netG.load_state_dict(save_model['netG'], strict=False)
         if save_model['netG_fine'] is not None:
@@ -51,20 +49,19 @@ def main(args):
 
     total_steps = 0
     last_best_val_mace = None
-    last_best_val_ue_loss = None
     while total_steps <= args.num_steps:
-        total_steps, last_best_val_mace = train(model, train_loader, args, total_steps, last_best_val_mace, last_best_val_ue_loss)
+        total_steps, last_best_val_mace = train(model, train_loader, args, total_steps, last_best_val_mace)
         if extended_loader is not None:
-            total_steps, last_best_val_mace = train(model, extended_loader, args, total_steps, last_best_val_mace, last_best_val_ue_loss, train_step_limit=len(train_loader))
+            total_steps, last_best_val_mace = train(model, extended_loader, args, total_steps, last_best_val_mace, train_step_limit=len(train_loader))
 
     test_dataset = datasets.fetch_dataloader(args, split='test')
     model_med = torch.load(args.save_dir + f'/{args.name}.pth')
-    model.netG.load_state_dict(model_med['netG'], strict=False if args.ue_mock else True)
+    model.netG.load_state_dict(model_med['netG'], strict=False)
     if args.two_stages:
-        model.netG_fine.load_state_dict(model_med['netG_fine'], strict=False if args.ue_mock else True)
+        model.netG_fine.load_state_dict(model_med['netG_fine'], strict=True)
     evaluate_SNet(model, test_dataset, batch_size=args.batch_size, args=args, wandb_log=True)
 
-def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_val_ue_loss, train_step_limit = None):
+def train(model, train_loader, args, total_steps, last_best_val_mace, train_step_limit = None):
     count = 0
     if args.neg_training:
         train_loader.dataset.recompute_negatives_random(args)
@@ -93,7 +90,7 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
             save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
                             torchvision.utils.make_grid(model.fake_warped_image_2, nrow=16, padding = 16, pad_value=0),
                             args.save_dir + f'/train_overlap_pred.png')
-            if args.two_stages and not args.ue_mock_freeze:
+            if args.two_stages:
                 save_img(torchvision.utils.make_grid(model.image_1_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_crop.png')
                 save_img(torchvision.utils.make_grid(model.image_2_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_crop.png')
         model.update_learning_rate()
@@ -119,15 +116,13 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
                 "lr": metrics["lr"][0],
                 "G_loss": metrics["G_loss"],
                 "D_loss": metrics["D_loss"] if args.neg_training else 0,
-                "ue_loss": metrics["ue_loss"] if args.ue_mock else 0,
-                "ce_loss": metrics["ce_loss"] if not args.ue_mock_freeze else 0,
-                "ue_neg_loss": metrics["ue_neg_loss"] if args.neg_training and args.ue_mock else 0,
+                "ce_loss": metrics["ce_loss"],
                 "neg_loss": metrics["neg_loss"] if args.neg_training else 0,
             },)
         total_steps += 1
         # Validate
         if total_steps % args.val_freq == args.val_freq - 1:
-            current_val_mace, current_val_ue_loss = validate(model, args, total_steps)
+            current_val_mace = validate(model, args, total_steps)
             # plot_train(logger, args)
             # plot_val(logger, args)
             PATH = args.save_dir + f'/{total_steps+1}_{args.name}.pth'
@@ -136,22 +131,13 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, last_best_
                 "netG_fine": model.netG_fine.state_dict() if args.two_stages else None,
             }
             torch.save(checkpoint, PATH)
-            if args.ue_mock and args.ue_mock_freeze:
-                if last_best_val_ue_loss is None or last_best_val_ue_loss > current_val_ue_loss:
-                    logging.info(f"Saving best model, last_best_val_ue_loss: {last_best_val_ue_loss}, current_val_ue_loss: {current_val_ue_loss}")
-                    last_best_val_ue_loss = current_val_ue_loss
-                    PATH = args.save_dir + f'/{args.name}.pth'
-                    torch.save(checkpoint, PATH)
-                else:
-                    logging.info(f"No Saving, last_best_val_ue_loss: {last_best_val_ue_loss}, current_val_ue_loss: {current_val_ue_loss}")
+            if last_best_val_mace is None or last_best_val_mace > current_val_mace:
+                logging.info(f"Saving best model, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
+                last_best_val_mace = current_val_mace
+                PATH = args.save_dir + f'/{args.name}.pth'
+                torch.save(checkpoint, PATH)
             else:
-                if last_best_val_mace is None or last_best_val_mace > current_val_mace:
-                    logging.info(f"Saving best model, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
-                    last_best_val_mace = current_val_mace
-                    PATH = args.save_dir + f'/{args.name}.pth'
-                    torch.save(checkpoint, PATH)
-                else:
-                    logging.info(f"No Saving, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
+                logging.info(f"No Saving, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
 
         if total_steps >= args.num_steps:
             break
@@ -168,9 +154,8 @@ def validate(model, args, total_steps):
     results.update(validate_process(model, args, total_steps))
     wandb.log({
                 "val_mace": results['val_mace'],
-                "val_ue_loss": results['val_ue_loss']
             })
-    return results['val_mace'], results['val_ue_loss']
+    return results['val_mace']
 
 
 if __name__ == "__main__":
