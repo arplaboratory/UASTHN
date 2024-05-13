@@ -20,4 +20,4 @@ else
     BAN=4
 fi
 
-python3 ./local_pipeline/myevaluate.py --dataset_name satellite_0_thermalmapping_135_largest_ori_train --eval_model logs/local_he/$MODEL/UAGL.pth --val_positive_dist_threshold $DC --lev0 --database_size 1536 --corr_level 4 --two_stages --fine_padding 32 --first_stage_ue --batch_size $BAN --ue_num_crops $CROP --ue_std_method $STDM --ue_agg $AGG --check_step $CS --iters_lev0 $IT0 --iters_lev1 $IT1 --ue_method ensemble --augment img --perspective_max 16 --rotate_max 0.523599 --resize_max 0.3 --multi_aug_eval
+python3 ./local_pipeline/myevaluate.py --dataset_name satellite_0_thermalmapping_135_largest_ori_train --eval_model logs/local_he/$MODEL/UAGL.pth --val_positive_dist_threshold $DC --lev0 --database_size 1536 --corr_level 4 --two_stages --fine_padding 32 --first_stage_ue --batch_size $BAN --ue_num_crops $CROP --ue_std_method $STDM --ue_agg $AGG --check_step $CS --iters_lev0 $IT0 --iters_lev1 $IT1 --ue_method ensemble --ue_mock

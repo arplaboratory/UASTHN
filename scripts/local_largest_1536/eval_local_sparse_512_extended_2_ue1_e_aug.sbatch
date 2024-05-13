@@ -2,7 +2,7 @@
 #SBATCH --nodes=1                        # requests 3 compute servers
 #SBATCH --ntasks-per-node=1              # runs 2 tasks on each server
 #SBATCH --cpus-per-task=8               # uses 1 compute core per task
-#SBATCH --time=00:40:00
+#SBATCH --time=01:00:00
 #SBATCH --array=10
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=250GB
