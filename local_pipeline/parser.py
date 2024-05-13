@@ -67,6 +67,7 @@ def parse_arguments():
     parser.add_argument("--neg_training", action="store_true")
     parser.add_argument("--neg_margin", type=float, default=2.0)
     parser.add_argument("--neg_loss_lambda", type=float, default=1.0, help="G_loss_lambda only for homo")
+    parser.add_argument("--si_min", type=float, default=-2.0) # ~ln(0.1)
     args = parser.parse_args()
     args.save_dir = "local_he"
     args.augment_type = "center"

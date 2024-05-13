@@ -147,7 +147,7 @@ class IHN(nn.Module):
                 else:
                     delta_four_point = self.update_block_4(corr, flow)
                     if self.args.ue_method == "single" and self.first_stage:
-                        ue_four_point = self.ue_update_block_4(corr, flow)
+                        ue_four_point = torch.clamp(self.ue_update_block_4(corr, flow), min=args.si_min)
                     
             try:
                 last_four_point_disp = four_point_disp
