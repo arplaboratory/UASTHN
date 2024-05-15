@@ -147,7 +147,7 @@ class IHN(nn.Module):
                 else:
                     delta_four_point = self.update_block_4(corr, flow)
                     if self.args.ue_method == "single" and self.first_stage:
-                        ue_four_point = torch.clamp(self.ue_update_block_4(corr, flow), min=args.si_min)
+                        ue_four_point = torch.clamp(self.ue_update_block_4(corr, flow), min=self.args.si_min)
                     
             try:
                 last_four_point_disp = four_point_disp
@@ -495,21 +495,12 @@ class UAGL():
             four_pred_five_crops = four_pred.view(four_pred.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
         std_four_pred_five_crops = torch.std(four_pred_five_crops, dim=1)
         mean_four_pred_five_crops = torch.mean(four_pred_five_crops, dim=1)
-        resize_maj_vote_rej = self.args.ue_maj_vote_rej
         four_pred_agg_list = []
         for i in range(len(four_pred_five_crops)):
             if self.args.ue_agg == "mean":
                 four_pred_agg = mean_four_pred_five_crops[i]
             elif self.args.ue_agg == "zero":
                 four_pred_agg = four_pred_five_crops[i, 0]
-            elif self.args.ue_agg == "maj_vote":
-                four_pred_agg = four_pred_five_crops[i, 0].clone()
-                count = 1
-                for j in range(1,self.args.ue_num_crops):
-                    if torch.norm(four_pred_five_crops[i, 0] - four_pred_five_crops[i, j]) <= resize_maj_vote_rej:
-                        four_pred_agg+=four_pred_five_crops[i, j]
-                        count+=1
-                four_pred_agg/=count
             four_pred_agg_list.append(four_pred_agg)
         four_pred_new = torch.stack(four_pred_agg_list)
         four_preds_list_new = []
