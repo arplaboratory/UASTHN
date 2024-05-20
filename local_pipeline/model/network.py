@@ -484,7 +484,7 @@ class UAGL():
                 four_preds_recovered_list = []
                 for i in range(len(four_preds_list)):
                     four_corners = four_preds_list[i] + self.four_point_org_single.repeat(four_preds_list[i].shape[0],1,1,1) # B x 2 x 2 x 2
-                    four_corners = torch.cat([four_corners, torch.ones((four_corners.shape[0], 1, 4)).to(four_corners.device)], dim=1) # B x 3 x 4
+                    four_corners = torch.cat([four_corners.view(four_corners.shape[0], 2, 4), torch.ones((four_corners.shape[0], 1, 4)).to(four_corners.device)], dim=1) # B x 3 x 4
                     four_corners = torch.bmm(self.H_CTtoT, four_corners) # B x 3 x 4
                     four_corners = four_corners[:,:2,:] / four_corners[:,2:,:] # B x 2 x 4
                     four_preds_recovered_single = four_corners.view(four_corners.shape[0], 2, 2, 2) - self.four_point_org_single.repeat(four_preds_list[i].shape[0],1,1,1)
