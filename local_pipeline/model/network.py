@@ -474,6 +474,7 @@ class UAGL():
         y_start += y_shift
         bbox_s = bbox.bbox_generator(x_start, y_start, w, w)
         bbox_s_swap = torch.stack([bbox_s[:, 0], bbox_s[:, 1], bbox_s[:, 3], bbox_s[:, 2]], dim=1)
+        self.xct_before = bbox_s_swap
         self.H_CTtoT = tgm.get_perspective_transform(bbox_s_swap, self.four_point_org_single.repeat(bbox_s_swap.shape[0],1,1,1).view(bbox_s_swap.shape[0], 2, 4).permute(0, 2, 1).contiguous())
         return bbox_s
 
@@ -483,11 +484,15 @@ class UAGL():
                 # Recover shift
                 four_preds_recovered_list = []
                 for i in range(len(four_preds_list)):
-                    four_corners = four_preds_list[i] + self.four_point_org_single.repeat(four_preds_list[i].shape[0],1,1,1) # B x 2 x 2 x 2
-                    four_corners = torch.cat([four_corners.view(four_corners.shape[0], 2, 4), torch.ones((four_corners.shape[0], 1, 4)).to(four_corners.device)], dim=1) # B x 3 x 4
-                    four_corners = torch.bmm(self.H_CTtoT, four_corners) # B x 3 x 4
+                    four_point_org_single_repeat = self.four_point_org_single.repeat(four_preds_list[i].shape[0],1,1,1)
+                    four_corners = four_preds_list[i] + four_point_org_single_repeat # B x 2 x 2 x 2
+                    H_StoT = tgm.get_perspective_transform(self.xct_before, four_corners.view(-1, 2, 4).permute(0, 2, 1).contiguous())
+                    H_StoT_inv = torch.linalg.inv(H_StoT)
+                    four_corners_aug = torch.cat([four_corners.view(four_corners.shape[0], 2, 4),
+                                                  torch.ones((four_corners.shape[0], 1, 4)).to(four_corners.device)], dim=1) # B x 3 x 4
+                    four_corners = torch.bmm(H_StoT, torch.bmm(self.H_CTtoT, torch.bmm(H_StoT_inv, four_corners_aug))) # B x 3 x 4
                     four_corners = four_corners[:,:2,:] / four_corners[:,2:,:] # B x 2 x 4
-                    four_preds_recovered_single = four_corners.view(four_corners.shape[0], 2, 2, 2) - self.four_point_org_single.repeat(four_preds_list[i].shape[0],1,1,1)
+                    four_preds_recovered_single = four_corners.view(four_corners.shape[0], 2, 2, 2) - four_point_org_single_repeat
                     four_preds_recovered_list.append(four_preds_recovered_single)
                 four_preds_list = four_preds_recovered_list
         four_pred = four_preds_list[check_step]
