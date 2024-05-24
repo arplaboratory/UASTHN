@@ -505,17 +505,26 @@ class UAGL():
             four_pred_five_crops = four_pred.view(four_pred.shape[0]//len(self.netG_list), len(self.netG_list), 2, 2, 2)
         elif self.args.ue_method == "augment":
             four_pred_five_crops = four_pred.view(four_pred.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
-        if self.args.ue_outlier_num > 0 and not for_training:
-            mace_distance = (four_pred_five_crops[:, :1] - four_pred_five_crops[:, 1:])**2
+        if self.args.ue_outlier_method != "none" and not for_training:
+            mace_distance = (four_pred_five_crops[:, :1] - four_pred_five_crops)**2
             mace_distance = (mace_distance[:, :, 0] + mace_distance[:, :, 1])**0.5
             mace_distance = mace_distance.mean(dim=2).mean(dim=2)
-            _, max_indices = torch.topk(mace_distance, self.args.ue_outlier_num, dim=1)
             mask = torch.ones((four_pred_five_crops.shape[0], four_pred_five_crops.shape[1])).to(four_pred_five_crops.device)
-            for i in range(self.args.ue_outlier_num):
-                max_indice = max_indices[:, i]
-                mask = mask.scatter_(1,(max_indice+1).unsqueeze(1), 0.)
+            if self.args.ue_outlier_method == "max":
+                _, max_indices = torch.topk(mace_distance, self.args.ue_outlier_num, dim=1)
+                for i in range(self.args.ue_outlier_num):
+                    max_indice = max_indices[:, i]
+                    mask = mask.scatter_(1,max_indice.unsqueeze(1), 0.)
+            elif self.args.ue_outlier_method == "dis":
+                mask[mace_distance > self.args.ue_outlier_dis] = False
+                for i in range(len(mask)):
+                    if torch.count_nonzero(mask[i]) <= self.args.ue_outlier_num:
+                        _, min_indices = torch.topk(mace_distance[i], self.args.ue_num_crops - self.args.ue_outlier_num, largest=False)
+                        mask[i] = False
+                        mask[i] = mask[i].scatter_(0, min_indices, 1.)
             four_pred_five_crops_res = four_pred_five_crops[mask.bool()].view(four_pred_five_crops.shape[0], four_pred_five_crops.shape[1] - self.args.ue_outlier_num, 2, 2, 2)
             std_four_pred_five_crops = torch.std(four_pred_five_crops_res, dim=1)
+            print(mace_distance)
         else:
             std_four_pred_five_crops = torch.std(four_pred_five_crops, dim=1)
         mean_four_pred_five_crops = torch.mean(four_pred_five_crops, dim=1)
