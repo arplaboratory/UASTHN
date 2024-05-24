@@ -58,9 +58,10 @@ def parse_arguments():
     parser.add_argument('--ue_mask_patchsize', type=int, default=16)
     parser.add_argument('--ue_aug_method', type=str, default="shift", choices=["shift", "mask"])
     parser.add_argument('--ue_agg', type=str, choices=["mean", "zero"], default="mean")
-    parser.add_argument('--ue_rej_std', type=float, nargs='+', default=[2.0, 4.0, 8.0, 16.0])
+    parser.add_argument('--ue_rej_std', type=float, nargs='+', default=[0.5, 1.0, 2.0, 4.0, 8.0, 16.0])
     parser.add_argument("--ue_seed", type=int, default=0)
     parser.add_argument("--ue_std_method", type=str, default="all", choices=["any", "all", "mean"])
+    parser.add_argument('--ue_outlier_num', type=int, default=0)
     parser.add_argument("--generate_test_pairs", action='store_true')
     parser.add_argument("--check_step", type=int, default=-1, choices=[-1,0,1,2,3,4,5])
     parser.add_argument("--neg_training", action="store_true")
@@ -74,4 +75,6 @@ def parse_arguments():
         raise KeyError("Finetune must work with two stages")
     if args.ue_num_crops > 10 or args.ue_num_crops < 2:
         raise NotImplementedError("Not implemented for ue_num_crops > 10 or < 1")
+    if args.ue_outlier_num >= args.ue_num_crops:
+        raise KeyError("outlier num cannot be larger than ue_num_crops-1")
     return args

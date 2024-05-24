@@ -176,7 +176,11 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
                 alpha = args.database_size / args.resize_width
                 four_point_bbox = four_point_bbox.flatten(2).permute(0, 2, 1).contiguous() / alpha
                 save_overlap_bbox_img(model.image_1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox, ue_mask=ue_mask)
-
+                if args.ue_method == "augment":
+                    four_point_gt_multi = four_point_gt.repeat(args.ue_num_crops, 1, 1)
+                    four_point_1_multi = four_point_1.repeat(args.ue_num_crops, 1, 1)
+                    save_overlap_bbox_img(model.image_1_multi, model.fake_warped_image_2_multi_before, save_dir + f'/train_overlap_bbox_before_recover_{i_batch}.png', four_point_gt_multi, four_point_1_multi)
+                    save_overlap_bbox_img(model.image_1_multi, model.fake_warped_image_2_multi_after, save_dir + f'/train_overlap_bbox_after_recover_{i_batch}.png', four_point_gt_multi, four_point_1_multi)
     for j in range(total_ue_mask.shape[1]):
         ue_mask_single = total_ue_mask[:,j]
         final_ue_mask = torch.count_nonzero(ue_mask_single)/len(ue_mask_single)

@@ -246,7 +246,7 @@ class UAGL():
         self.image_2 = B.to(self.device, non_blocking=True)
         self.flow_gt = flow_gt.to(self.device, non_blocking=True)
         if self.flow_gt is not None:
-            self.real_warped_image_2 = mywarp(self.image_2, self.flow_gt, self.four_point_org_single)
+            self.real_warped_image_2 = mywarp(self.image_2, self.flow_gt, self.four_point_org_single) # Comment for performance evaluation 
             self.flow_4cor = torch.zeros((self.flow_gt.shape[0], 2, 2, 2)).to(self.flow_gt.device)
             self.flow_4cor[:, :, 0, 0] = self.flow_gt[:, :, 0, 0]
             self.flow_4cor[:, :, 0, 1] = self.flow_gt[:, :, 0, -1]
@@ -285,10 +285,14 @@ class UAGL():
             # for i in range(len(self.four_preds_list)): # DEBUG
             #     self.four_preds_list[i] = self.flow_4cor # DEBUG
             # self.four_pred = self.flow_4cor # DEBUG
+            if self.args.ue_method == "augment":
+                self.fake_warped_image_2_multi_before = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation 
             if self.args.ue_method != "single":
                 self.four_preds_list, self.four_pred = self.first_stage_ue_aggregation(self.four_preds_list, self.four_pred, for_training)
             if self.args.ue_method == "augment":
                 B5, C, H, W = self.image_2.shape
+                image_2_full = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, :1].repeat(1, self.args.ue_num_crops, 1, 1, 1).view(-1, C, H, W)
+                self.fake_warped_image_2_multi_after = mywarp(image_2_full, self.four_pred_recovered, self.four_point_org_single) # Comment for performance evaluation
                 self.image_1_multi = self.image_1
                 self.image_2_multi = self.image_2
                 self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
@@ -495,12 +499,25 @@ class UAGL():
                     four_preds_recovered_single = four_corners.view(four_corners.shape[0], 2, 2, 2) - four_point_org_single_repeat
                     four_preds_recovered_list.append(four_preds_recovered_single)
                 four_preds_list = four_preds_recovered_list
+                self.four_pred_recovered = four_preds_list[check_step]
         four_pred = four_preds_list[check_step]
         if self.args.ue_method == "ensemble":
             four_pred_five_crops = four_pred.view(four_pred.shape[0]//len(self.netG_list), len(self.netG_list), 2, 2, 2)
         elif self.args.ue_method == "augment":
             four_pred_five_crops = four_pred.view(four_pred.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
-        std_four_pred_five_crops = torch.std(four_pred_five_crops, dim=1)
+        if self.args.ue_outlier_num > 0 and not for_training:
+            mace_distance = (four_pred_five_crops[:, :1] - four_pred_five_crops[:, 1:])**2
+            mace_distance = (mace_distance[:, :, 0] + mace_distance[:, :, 1])**0.5
+            mace_distance = mace_distance.mean(dim=2).mean(dim=2)
+            _, max_indices = torch.topk(mace_distance, self.args.ue_outlier_num, dim=1)
+            mask = torch.ones((four_pred_five_crops.shape[0], four_pred_five_crops.shape[1])).to(four_pred_five_crops.device)
+            for i in range(self.args.ue_outlier_num):
+                max_indice = max_indices[:, i]
+                mask = mask.scatter_(1,(max_indice+1).unsqueeze(1), 0.)
+            four_pred_five_crops_res = four_pred_five_crops[mask.bool()].view(four_pred_five_crops.shape[0], four_pred_five_crops.shape[1] - self.args.ue_outlier_num, 2, 2, 2)
+            std_four_pred_five_crops = torch.std(four_pred_five_crops_res, dim=1)
+        else:
+            std_four_pred_five_crops = torch.std(four_pred_five_crops, dim=1)
         mean_four_pred_five_crops = torch.mean(four_pred_five_crops, dim=1)
         four_pred_agg_list = []
         for i in range(len(four_pred_five_crops)):
