@@ -61,7 +61,7 @@ def parse_arguments():
     parser.add_argument('--ue_rej_std', type=float, nargs='+', default=[0.5, 1.0, 2.0, 4.0, 8.0, 16.0])
     parser.add_argument("--ue_seed", type=int, default=0)
     parser.add_argument("--ue_std_method", type=str, default="all", choices=["any", "all", "mean"])
-    parser.add_argument('--ue_outlier_method', type=str, default="max", choices=["max", "dis", "maxmean", "dismean", "none"])
+    parser.add_argument('--ue_outlier_method', type=str, default="none", choices=["max", "dis", "none"])
     parser.add_argument('--ue_outlier_num', type=int, default=0)
     parser.add_argument('--ue_outlier_dis', type=float, default=0)
     parser.add_argument("--generate_test_pairs", action='store_true')
