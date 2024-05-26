@@ -292,7 +292,7 @@ class UAGL():
             if self.args.ue_method == "augment":
                 B5, C, H, W = self.image_2.shape
                 image_2_full = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, :1].repeat(1, self.args.ue_num_crops, 1, 1, 1).view(-1, C, H, W)
-                self.fake_warped_image_2_multi_after = mywarp(image_2_full, self.four_pred_recovered, self.four_point_org_single) # Comment for performance evaluation
+                self.fake_warped_image_2_multi_after = mywarp(image_2_full, self.four_preds_list[self.args.check_step], self.four_point_org_single) # Comment for performance evaluation
                 self.image_1_multi = self.image_1
                 self.image_2_multi = self.image_2
                 self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
@@ -501,7 +501,6 @@ class UAGL():
                     four_preds_recovered_single = four_corners.view(four_corners.shape[0], 2, 2, 2) - four_point_org_single_repeat
                     four_preds_recovered_list.append(four_preds_recovered_single)
                 four_preds_list = four_preds_recovered_list
-                self.four_pred_recovered = four_preds_list[check_step]
         four_pred = four_preds_list[check_step]
         if self.args.ue_method == "ensemble":
             four_pred_five_crops = four_pred.view(four_pred.shape[0]//len(self.netG_list), len(self.netG_list), 2, 2, 2)
@@ -538,7 +537,7 @@ class UAGL():
                 four_pred_agg = four_pred_five_crops[i, 0]
             four_pred_agg_list.append(four_pred_agg)
         four_pred_new = torch.stack(four_pred_agg_list)
-        four_preds_list_new = []
+        # four_preds_list_new = []
         four_preds_std_list_new = []
         for i in range(len(four_preds_list)):
             if self.args.ue_method == "ensemble":
@@ -547,10 +546,10 @@ class UAGL():
                 four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
             # Mean for training
             std_four_pred_single = torch.std(four_pred_single, dim=1)
-            mean_four_pred_single = torch.mean(four_pred_single, dim=1)
-            four_preds_list_new.append(mean_four_pred_single)
+            # mean_four_pred_single = torch.mean(four_pred_single, dim=1)
+            # four_preds_list_new.append(mean_four_pred_single)
             four_preds_std_list_new.append(std_four_pred_single)
-        return four_preds_list_new, four_pred_new, four_preds_std_list_new, std_four_pred_five_crops
+        return four_preds_list, four_pred_new, four_preds_std_list_new, std_four_pred_five_crops
 
     def stack_ensemble_results(self, four_preds_list_ensemble, four_pred_ensemble):
         four_preds_list = []
