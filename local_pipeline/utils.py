@@ -146,7 +146,7 @@ def warp(x, flo):
 def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None):
     """ Loss function defined over sequence of flow predictions """
 
-    if args.ue_method == "augment":
+    if args.first_stage_ue and args.ue_method == "augment":
         flow_4cor = torch.zeros((four_preds[0].shape[0]//args.ue_num_crops, 2, 2, 2)).to(four_preds[0].device)
         flow_4cor[:, :, 0, 0] = flow_gt[:, :, 0, 0]
         flow_4cor[:, :, 0, 1] = flow_gt[:, :, 0, -1]
@@ -167,13 +167,13 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None):
         flow_4cor[:, :, 1, 1] = flow_gt[:, :, -1, -1]
     ce_loss = 0.0
 
-    if args.ue_method == "single":
+    if args.first_stage_ue and args.ue_method == "single":
         assert four_ue_list is not None
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
             i4cor_loss = (four_preds[i] - flow_4cor)**2*torch.exp(-four_ue_list[i])/2 + four_ue_list[i]/2
             ce_loss += i_weight * (i4cor_loss).mean()
-    elif args.ue_method == "augment":
+    elif args.first_stage_ue and args.ue_method == "augment":
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
             i4cor_loss = (four_preds[i] - flow_4cor_repeat).abs()
