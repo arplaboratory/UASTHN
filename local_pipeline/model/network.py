@@ -442,9 +442,9 @@ class UAGL():
         y_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
         if self.args.ue_shift_crops_types == "grid":
             resized_ue_shift_sample = resized_ue_shift
-            if self.args.ue_num_crops >= 2 and self.args.ue_num_crops <= 10:
-                x_shift_grid = np.linspace(0, resized_ue_shift_sample, 3) # 1 -> 1 2-4 -> 4 5-9 -> 9    
-                y_shift_grid = np.linspace(0, resized_ue_shift_sample, 3)
+            if self.args.ue_num_crops >= 2 and self.args.ue_num_crops <= 5:
+                x_shift_grid = np.linspace(0, resized_ue_shift_sample, 2) # 1 -> 1 2-4 -> 4 5-9 -> 9    
+                y_shift_grid = np.linspace(0, resized_ue_shift_sample, 2)
             else:
                 raise NotImplementedError()
             x_shift_grid, y_shift_grid = np.meshgrid(x_shift_grid, y_shift_grid)

@@ -49,7 +49,7 @@ def parse_arguments():
     parser.add_argument('--multi_aug_eval', action="store_true")
     parser.add_argument("--exclude_val_region",action="store_true")
     parser.add_argument('--first_stage_ue', action="store_true")
-    parser.add_argument('--ue_method', type=str, default="augment", choices=["augment", "ensemble", "single"])
+    parser.add_argument('--ue_method', type=str, default="augment", choices=["augment", "ensemble", "single", "dropout"])
     parser.add_argument('--ue_ensemble_load_models', type=str, default="./local_pipeline/ensemble.txt")
     parser.add_argument('--ue_shift', type=int, default=64)
     parser.add_argument('--ue_num_crops', type=int, default=5)
@@ -64,6 +64,7 @@ def parse_arguments():
     parser.add_argument('--ue_outlier_method', type=str, default="none", choices=["max", "dis", "none"])
     parser.add_argument('--ue_outlier_num', type=int, default=0)
     parser.add_argument('--ue_outlier_dis', type=float, default=0)
+    parser.add_argument('--ue_dropout', type=float, default=0.0)
     parser.add_argument("--generate_test_pairs", action='store_true')
     parser.add_argument("--check_step", type=int, default=-1, choices=[-1,0,1,2,3,4,5])
     parser.add_argument("--neg_training", action="store_true")
@@ -75,7 +76,7 @@ def parse_arguments():
     args.augment_type = "center"
     if args.finetune and not args.two_stages:
         raise KeyError("Finetune must work with two stages")
-    if args.ue_num_crops > 10 or args.ue_num_crops < 2:
+    if args.ue_num_crops > 5 or args.ue_num_crops < 2:
         raise NotImplementedError("Not implemented for ue_num_crops > 10 or < 1")
     if args.ue_outlier_num >= args.ue_num_crops:
         raise KeyError("outlier num cannot be larger than ue_num_crops-1")
