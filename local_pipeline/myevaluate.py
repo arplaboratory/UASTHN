@@ -22,43 +22,59 @@ import commons
 import logging
 import wandb
 
-def test(args, wandb_log):
-    if not args.identity:
-        model = UAGL(args)
-        if args.first_stage_ue and args.ue_method == "ensemble":
-            for i in range(len(model.netG_list)):
-                model_med = torch.load(model.ensemble_model_names[i], map_location='cuda:0')
-                for key in list(model_med['netG'].keys()):
-                    model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
-                for key in list(model_med['netG'].keys()):
-                    if key.startswith('module'):
-                        del model_med['netG'][key]
-                model.netG_list[i].load_state_dict(model_med['netG'], strict=True)
-        else:
-            model_med = torch.load(args.eval_model, map_location='cuda:0')
+def load_model(args, model):
+    if args.first_stage_ue and args.ue_method == "ensemble":
+        for i in range(len(model.netG_list)):
+            model_med = torch.load(model.ensemble_model_names[i], map_location='cuda:0')
             for key in list(model_med['netG'].keys()):
                 model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
             for key in list(model_med['netG'].keys()):
                 if key.startswith('module'):
                     del model_med['netG'][key]
-            model.netG.load_state_dict(model_med['netG'], strict=True)
-        if args.two_stages:
-            model_med = torch.load(args.eval_model, map_location='cuda:0')
-            for key in list(model_med['netG_fine'].keys()):
-                model_med['netG_fine'][key.replace('module.','')] = model_med['netG_fine'][key]
-            for key in list(model_med['netG_fine'].keys()):
-                if key.startswith('module'):
-                    del model_med['netG_fine'][key]
-            model.netG_fine.load_state_dict(model_med['netG_fine'], strict=True)
-        
-        model.setup() 
-        if args.first_stage_ue and args.ue_method == "ensemble":
-            for i in range(len(model.netG_list)):
-                model.netG_list[i].eval()
+            model.netG_list[i].load_state_dict(model_med['netG'], strict=True)
+    else:
+        model_med = torch.load(args.eval_model, map_location='cuda:0')
+        for key in list(model_med['netG'].keys()):
+            model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
+        for key in list(model_med['netG'].keys()):
+            if key.startswith('module'):
+                del model_med['netG'][key]
+        model.netG.load_state_dict(model_med['netG'], strict=True)
+    if args.two_stages:
+        model_med = torch.load(args.eval_model, map_location='cuda:0')
+        for key in list(model_med['netG_fine'].keys()):
+            model_med['netG_fine'][key.replace('module.','')] = model_med['netG_fine'][key]
+        for key in list(model_med['netG_fine'].keys()):
+            if key.startswith('module'):
+                del model_med['netG_fine'][key]
+        model.netG_fine.load_state_dict(model_med['netG_fine'], strict=True)
+    
+    model.setup() 
+    if args.first_stage_ue and args.ue_method == "ensemble":
+        for i in range(len(model.netG_list)):
+            model.netG_list[i].eval()
+    else:
+        model.netG.eval()
+    if args.two_stages:
+        model.netG_fine.eval()
+    return model
+
+def test(args, wandb_log):
+    if not args.identity:
+        if not args.ue_method == "augment_ensemble":
+            model = UAGL(args)
+            model = load_model(args, model)
         else:
-            model.netG.eval()
-        if args.two_stages:
-            model.netG_fine.eval()
+            model = []
+            args.ue_method = "augment"
+            model_single = UAGL(args)
+            model_single = load_model(args, model_single)
+            model.append(model_single)
+            args.ue_method = "ensemble"
+            model_single = UAGL(args)
+            model_single = load_model(args, model_single)
+            model.append(model_single)
+            args.ue_method = "augment_ensemble"
     else:
         model = None
     if args.test:
@@ -100,7 +116,11 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         if not args.identity:
             with torch.no_grad():
                 # time_start = time.time()
-                model.forward(for_test=False)
+                if not args.ue_method == "augment_ensemble":
+                    model.forward(for_test=False)
+                else:
+                    for model_single in model:
+                        model.forward(for_test=False)
                 # time_end = time.time()
                 four_pred = model.four_pred
                 # timeall.append(time_end-time_start)
@@ -114,7 +134,12 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         # print(mace_[0,:])
         ue_mask = torch.ones((mace_vec.shape[0], len(args.ue_rej_std)))
         if args.first_stage_ue:
-            ue_std = model.std_four_pred_five_crops.view(model.std_four_pred_five_crops.shape[0], -1)
+            if args.ue_method == "augment_ensemble":
+                model_eval = model[0]
+                model_eval.std_four_pred_five_crops = torch.cat([model_eval.std_four_pred_five_crops, model[1].std_four_pred_five_crops], dim=1)
+            else:
+                model_eval = model
+            ue_std = model_eval.std_four_pred_five_crops.view(model.std_four_pred_five_crops.shape[0], -1)
             ue_mask_list = []
             for j in range(len(args.ue_rej_std)):
                 if args.ue_std_method == "any":
@@ -165,22 +190,22 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
             if not os.path.exists(save_dir):
                 os.mkdir(save_dir)
             if not args.two_stages:
-                save_overlap_bbox_img(model.image_1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, ue_mask=ue_mask)
+                save_overlap_bbox_img(model_eval.image_1, model_eval.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, ue_mask=ue_mask)
             else:
                 four_point_org_single_ori = torch.zeros((1, 2, 2, 2))
                 four_point_org_single_ori[:, :, 0, 0] = torch.Tensor([0, 0])
                 four_point_org_single_ori[:, :, 0, 1] = torch.Tensor([args.database_size - 1, 0])
                 four_point_org_single_ori[:, :, 1, 0] = torch.Tensor([0, args.database_size - 1])
                 four_point_org_single_ori[:, :, 1, 1] = torch.Tensor([args.database_size - 1, args.database_size - 1])
-                four_point_bbox = model.flow_bbox.cpu().detach() + four_point_org_single_ori
+                four_point_bbox = model_eval.flow_bbox.cpu().detach() + four_point_org_single_ori
                 alpha = args.database_size / args.resize_width
                 four_point_bbox = four_point_bbox.flatten(2).permute(0, 2, 1).contiguous() / alpha
-                save_overlap_bbox_img(model.image_1, model.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox, ue_mask=ue_mask)
+                save_overlap_bbox_img(model_eval.image_1, model_eval.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox, ue_mask=ue_mask)
                 if args.ue_method == "augment":
                     four_point_gt_multi = four_point_gt.repeat(args.ue_num_crops, 1, 1)
                     four_point_1_multi = four_point_1.repeat(args.ue_num_crops, 1, 1)
-                    save_overlap_bbox_img(model.image_1_multi, model.fake_warped_image_2_multi_before, save_dir + f'/train_overlap_bbox_before_recover_{i_batch}.png', four_point_gt_multi, four_point_1_multi)
-                    save_overlap_bbox_img(model.image_1_multi, model.fake_warped_image_2_multi_after, save_dir + f'/train_overlap_bbox_after_recover_{i_batch}.png', four_point_gt_multi, four_point_1_multi)
+                    save_overlap_bbox_img(model_eval.image_1_multi, model_eval.fake_warped_image_2_multi_before, save_dir + f'/train_overlap_bbox_before_recover_{i_batch}.png', four_point_gt_multi, four_point_1_multi)
+                    save_overlap_bbox_img(model_eval.image_1_multi, model_eval.fake_warped_image_2_multi_after, save_dir + f'/train_overlap_bbox_after_recover_{i_batch}.png', four_point_gt_multi, four_point_1_multi)
     for j in range(total_ue_mask.shape[1]):
         ue_mask_single = total_ue_mask[:,j]
         final_ue_mask = torch.count_nonzero(ue_mask_single)/len(ue_mask_single)
