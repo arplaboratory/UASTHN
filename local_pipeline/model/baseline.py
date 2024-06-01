@@ -3,10 +3,11 @@ import torch
 from model.ATT.attention_layer import Correlation, AttentionLayer
 import torch.nn.functional as F
 class DHN(nn.Module):
-    def __init__(self, args, first_stage):
+    def __init__(self, args, first_stage, ue_method):
         super().__init__()
         self.device = torch.device('cuda:' + str(args.gpuid[0]))
         self.args = args
+        self.ue_method = ue_method
         self.first_stage = first_stage
         self.layer1 = nn.Sequential(nn.Conv2d(6,64,3,padding=1),
                                     nn.BatchNorm2d(64),
@@ -60,7 +61,7 @@ class DHN(nn.Module):
         out = out.view(-1,128* 32* 32)
         out = self.fc1(out)
         out = self.fc2(out)
-        if self.args.ue_method == "single" and self.first_stage:
+        if self.ue_method == "single" and self.first_stage:
             out_ue = out[:, 8:]
             out = out[:, :8]
             out = out.view(-1, 2, 2, 2)
@@ -79,10 +80,11 @@ class conv3x3(nn.Module):
         return self.conv(x)
 
 class LocalTrans(nn.Module):
-    def __init__(self, args, first_stage):
+    def __init__(self, args, first_stage, ue_method):
         super().__init__()
         self.device = torch.device('cuda:' + str(args.gpuid[0]))
         self.args = args
+        self.ue_method = ue_method
         self.first_stage = first_stage
         self.conv1 = nn.Sequential(conv3x3(3, 32), conv3x3(32, 32), nn.MaxPool2d(2, 2))
         self.conv2 = nn.Sequential(conv3x3(32, 64), conv3x3(64, 64), nn.MaxPool2d(2, 2))
@@ -165,7 +167,7 @@ class LocalTrans(nn.Module):
             corr = Correlation.apply(x.contiguous(), y.contiguous(), self.kernel_list[L], self.pad_list[L])
             corr = corr.permute(0, 3, 1, 2) / x.shape[1]
             homo_flow = self.homo_estim[L+1](corr) * scale * self.bias_list[L]
-            if self.args.first_stage_ue and self.args.ue_method == "single":
+            if self.args.first_stage_ue and self.ue_method == "single":
                 homo_ue = self.homo_ue_estim[L+1](corr)
                 out_ue = homo_ue.reshape(B, 2, 2, 2)
                 out_ue_list.append(out_ue)
