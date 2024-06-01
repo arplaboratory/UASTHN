@@ -65,6 +65,7 @@ def parse_arguments():
     parser.add_argument('--ue_outlier_num', type=int, default=0)
     parser.add_argument('--ue_outlier_dis', type=float, default=0)
     parser.add_argument('--ue_dropout', type=float, default=0.0)
+    parser.add_argument('--ue_combine', type=str, default="concat", choices=["concat", "add", "max"])
     parser.add_argument("--generate_test_pairs", action='store_true')
     parser.add_argument("--check_step", type=int, default=-1, choices=[-1,0,1,2,3,4,5])
     parser.add_argument("--neg_training", action="store_true")

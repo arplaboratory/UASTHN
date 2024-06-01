@@ -142,7 +142,14 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         if args.first_stage_ue:
             if args.ue_method == "augment_ensemble":
                 model_eval = model[0]
-                model_eval.std_four_pred_five_crops = torch.cat([model_eval.std_four_pred_five_crops, model[1].std_four_pred_five_crops], dim=1)
+                if args.ue_combine == "concat":
+                    model_eval.std_four_pred_five_crops = torch.cat([model_eval.std_four_pred_five_crops, model[1].std_four_pred_five_crops], dim=1)
+                elif args.ue_combine == "add":
+                    model_eval.std_four_pred_five_crops = model_eval.std_four_pred_five_crops + model[1].std_four_pred_five_crops
+                elif args.ue_combine == "max":
+                    model_eval.std_four_pred_five_crops = torch.max(torch.stack([model_eval.std_four_pred_five_crops, model[1].std_four_pred_five_crops], dim=-1), dim=-1)[0]
+                else:
+                    raise NotImplementError()
             else:
                 model_eval = model
             ue_std = model_eval.std_four_pred_five_crops.view(model_eval.std_four_pred_five_crops.shape[0], -1)
