@@ -106,7 +106,11 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
             logging.info(f"the first 5th database UTMs: {database_utm[:5]}")
 
         if not args.identity:
-            model.set_input(img1, img2, flow_gt)
+            if not args.ue_method == "augment_ensemble":
+                model.set_input(img1, img2, flow_gt)
+            else:
+                for model_single in model:
+                    model_single.set_input(img1, img2, flow_gt)
         flow_4cor = torch.zeros((flow_gt.shape[0], 2, 2, 2))
         flow_4cor[:, :, 0, 0] = flow_gt[:, :, 0, 0]
         flow_4cor[:, :, 0, 1] = flow_gt[:, :, 0, -1]
@@ -115,16 +119,18 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
 
         if not args.identity:
             with torch.no_grad():
-                # time_start = time.time()
                 if not args.ue_method == "augment_ensemble":
-                    model.forward(for_test=False)
+                    # time_start = time.time()
+                    model.forward(for_test=True)
+                    # time_end = time.time()
+                    # timeall.append(time_end-time_start)
+                    # print(time_end-time_start)
+                    four_pred = model.four_pred
+                
                 else:
                     for model_single in model:
-                        model.forward(for_test=False)
-                # time_end = time.time()
-                four_pred = model.four_pred
-                # timeall.append(time_end-time_start)
-                # print(time_end-time_start)
+                        model_single.forward(for_test=True)
+                    four_pred = model[0].four_pred
         else:
             four_pred = torch.zeros((flow_gt.shape[0], 2, 2, 2))
 
@@ -139,7 +145,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
                 model_eval.std_four_pred_five_crops = torch.cat([model_eval.std_four_pred_five_crops, model[1].std_four_pred_five_crops], dim=1)
             else:
                 model_eval = model
-            ue_std = model_eval.std_four_pred_five_crops.view(model.std_four_pred_five_crops.shape[0], -1)
+            ue_std = model_eval.std_four_pred_five_crops.view(model_eval.std_four_pred_five_crops.shape[0], -1)
             ue_mask_list = []
             for j in range(len(args.ue_rej_std)):
                 if args.ue_std_method == "any":
