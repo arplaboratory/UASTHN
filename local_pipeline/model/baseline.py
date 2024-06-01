@@ -37,7 +37,10 @@ class DHN(nn.Module):
                                     nn.BatchNorm2d(128),
                                     nn.ReLU())
         self.fc1 = nn.Linear(128*32*32,1024)
-        self.fc2 = nn.Linear(1024,8)
+        if self.args.ue_method == "single" and self.first_stage:
+            self.fc2 = nn.Linear(1024,16)
+        else:
+            self.fc2 = nn.Linear(1024,8)
 
     def forward(self, image1, image2, iters_lev0 = 6, iters_lev1=3, corr_level=2, corr_radius=4):
         # image1 = 2 * (image1 / 255.0) - 1.0
@@ -57,8 +60,15 @@ class DHN(nn.Module):
         out = out.view(-1,128* 32* 32)
         out = self.fc1(out)
         out = self.fc2(out)
-        out = out.view(-1, 2, 2, 2)
-        return [out], out
+        if self.args.ue_method == "single" and self.first_stage:
+            out_ue = out[:, 8:]
+            out = out[:, :8]
+            out = out.view(-1, 2, 2, 2)
+            out_ue = out_ue.view(-1, 2, 2, 2)
+            return [out], out, [out_ue]
+        else:
+            out = out.view(-1, 2, 2, 2)
+            return [out], out
     
 class conv3x3(nn.Module):
     def __init__(self, in_c, out_c):
@@ -111,6 +121,21 @@ class LocalTrans(nn.Module):
 
         self.homo_estim = [self.homo1, self.homo2, self.homo3, self.homo4, self.homo5]
 
+        if self.args.first_stage_ue and self.args.ue_method == "single":
+            self.homo1ue = nn.Sequential(conv3x3(25, 128), conv3x3(128, 128), nn.MaxPool2d(2, 2),
+                conv3x3(128, 256), conv3x3(256, 256), nn.MaxPool2d(2, 2), 
+                conv3x3(256, 256), conv3x3(256, 256), nn.AvgPool2d(2, 2), nn.Conv2d(256, 8, 1))
+            self.homo2ue = nn.Sequential(conv3x3(25, 128), conv3x3(128, 128), nn.MaxPool2d(2, 2),
+                conv3x3(128, 128), conv3x3(128, 128), nn.MaxPool2d(2, 2),
+                conv3x3(128, 256), conv3x3(256, 256), nn.MaxPool2d(2, 2), 
+                conv3x3(256, 256), conv3x3(256, 256), nn.AvgPool2d(2, 2), nn.Conv2d(256, 8, 1))
+            self.homo3ue = nn.Sequential(conv3x3(81, 128), conv3x3(128, 128), nn.MaxPool2d(2, 2),
+                conv3x3(128, 128), conv3x3(128, 128), nn.MaxPool2d(2, 2),
+                conv3x3(128, 256), conv3x3(256, 256), nn.MaxPool2d(2, 2), 
+                conv3x3(256, 256), conv3x3(256, 256), nn.MaxPool2d(2, 2),
+                conv3x3(256, 256), conv3x3(256, 256), nn.AvgPool2d(2, 2), nn.Conv2d(256, 8, 1))
+            self.homo_ue_estim = [self.homo1, self.homo2, self.homo3]
+
         self.kernel_list = [5, 7, 9, 9, 9]
         self.pad_list = [2, 3, 4, 4, 4]
         self.scale_list = [16, 8, 4, 4, 4]
@@ -124,6 +149,7 @@ class LocalTrans(nn.Module):
         device = x.device
         B, C, H, W = x.shape
         out_list = []
+        out_ue_list = []
         
         for L in range(1):
             x, y = self.conv2(self.conv1(x)), self.conv2(self.conv1(y))
@@ -139,8 +165,12 @@ class LocalTrans(nn.Module):
             corr = Correlation.apply(x.contiguous(), y.contiguous(), self.kernel_list[L], self.pad_list[L])
             corr = corr.permute(0, 3, 1, 2) / x.shape[1]
             homo_flow = self.homo_estim[L+1](corr) * scale * self.bias_list[L]
+            if self.args.first_stage_ue and self.args.ue_method == "single":
+                homo_ue = self.homo_ue_estim[L+1](corr)
+                out_ue = homo_ue.reshape(B, 2, 2, 2)
+                out_ue_list.append(out_ue)
             out = homo_flow.reshape(B, 2, 2, 2)
             out_list.append(out)
 
-        return [out], out
+        return [out], out, [out_ue_list[-1]]
            
