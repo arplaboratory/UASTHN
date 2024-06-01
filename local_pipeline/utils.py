@@ -223,16 +223,17 @@ def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None):
         flow_4cor[:, :, 1, 0] = flow_gt[:, :, -1, 0]
         flow_4cor[:, :, 1, 1] = flow_gt[:, :, -1, -1]
 
-    ce_loss = (four_preds[0] - flow_4cor).abs().mean()
-
+    if args.first_stage_ue and args.ue_method == "single":
+        assert four_ue_list is not None
+        ce_loss = ((four_preds[0] - flow_4cor)**2*torch.exp(-four_ue_list[0])/2 + four_ue_list[0]/2).mean()
+    else:
+        ce_loss = (four_preds[0] - flow_4cor).abs().mean()
+        
     mace = torch.sum((four_preds[0] - flow_4cor) ** 2, dim=1).sqrt()
     metrics['1px'] = (mace < 1).float().mean().item()
     metrics['3px'] = (mace < 3).float().mean().item()
     metrics['mace'] = mace.mean().item()
     metrics['ce_loss'] = ce_loss.item()
-    
-    if four_ue_list is not None:
-        raise NotImplementedError()
 
     return ce_loss, metrics
 
