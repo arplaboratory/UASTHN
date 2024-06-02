@@ -130,7 +130,7 @@ class IHN(nn.Module):
         # print(fmap1.shape, fmap2.shape)
         corr_fn = CorrBlock(fmap1, fmap2, num_levels=corr_level, radius=corr_radius)
         coords0, coords1 = self.initialize_flow_4(image1)
-        if self.args.check_step != -1 and self.first_stage:
+        if self.args.check_step != -1 and self.first_stage and self.ue_method == "augment":
             B, C, H, W = fmap1.shape
             corr_fn_early = CorrBlock(fmap1.view(B//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0], fmap2.view(B//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0], num_levels=corr_level, radius=corr_radius)
             coords0_early = coords0.view(coords0.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, coords0.shape[1], coords0.shape[2], coords0.shape[3])[:,0]
@@ -146,9 +146,12 @@ class IHN(nn.Module):
             if (self.first_stage and (self.args.check_step == -1 or itr <= self.args.check_step)) or not self.first_stage:
                 corr = corr_fn(coords1)
                 flow = coords1 - coords0
-            else:
+            elif self.ue_method=="augment":
                 corr = corr_fn_early(coords1_early)
                 flow = coords1_early - coords0_early
+            else:
+                corr = corr_fn(coords1)
+                flow = coords1 - coords0
             # print(corr.shape, flow.shape)
             with autocast(enabled=self.args.mixed_precision):
                 if self.args.weight:
@@ -165,7 +168,7 @@ class IHN(nn.Module):
                 four_point_predictions.append(four_point_disp)
                 if self.ue_method == "single" and self.first_stage:
                     four_point_ues.append(ue_four_point)
-                if itr == self.args.check_step and self.first_stage:
+                if itr == self.args.check_step and self.first_stage and self.ue_method == "augment":
                     self.sz = torch.Size([self.sz[0]//self.args.ue_num_crops, self.sz[1], self.sz[2], self.sz[3]])
                     four_point_disp = four_point_disp.view(four_point_disp.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)[:, 0]
                     coords1_early = coords1.view(coords1.shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, coords1.shape[1], coords1.shape[2], coords1.shape[3])[:, 0]
@@ -175,7 +178,7 @@ class IHN(nn.Module):
                 four_point_disp = last_four_point_disp
                 coords1 = self.get_flow_now_4(four_point_disp) # Possible error: Unsolvable H
                 four_point_predictions.append(four_point_disp)
-                if self.ue_method == "single" and self.first_stage:
+                if self.ue_method == "single" and self.first_stage and self.ue_method == "augment":
                     four_point_ues.append(ue_four_point)
                 if itr == self.args.check_step and not self.first_stage:
                     self.sz = torch.Size([self.sz[0]//self.args.ue_num_crops, self.sz[1], self.sz[2], self.sz[3]])
@@ -230,8 +233,8 @@ class UAGL():
             args.corr_level = corr_level
             if args.restore_ckpt is not None and not args.finetune:
                 self.set_requires_grad(self.netG, False)
-        self.criterionAUX = sequence_loss if self.args.arch == "IHN" or self.args.arch == "LocalTrans" else single_loss
-        self.criterionNEG = sequence_neg_loss if self.args.arch == "IHN" or self.args.arch == "LocalTrans" else single_neg_loss
+        self.criterionAUX = sequence_loss if self.args.arch == "IHN" else single_loss
+        self.criterionNEG = sequence_neg_loss if self.args.arch == "IHN" else single_neg_loss
         if self.args.first_stage_ue:
             self.ue_rng = np.random.default_rng(seed=args.ue_seed)
         if for_training:
