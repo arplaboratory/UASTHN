@@ -293,7 +293,7 @@ class UAGL():
         if self.args.first_stage_ue:
             if self.ue_method == "ensemble":
                 four_preds_list_ensemble = []
-                four_preds_list, _ = self.netG_list[i](image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level, early_stop=self.args.check_step)
+                four_preds_list, _ = self.netG_list[0](image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level, early_stop=self.args.check_step)
                 four_preds_list_ensemble.append(four_preds_list)
                 for i in range(1, len(self.netG_list)):
                     four_preds_list, _ = self.netG_list[i](image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level, early_stop=self.args.check_step)
