@@ -24,23 +24,41 @@ from myevaluate import evaluate_SNet
 
 def main(args):
     model = UAGL(args, for_training=True)
-    model.setup()
-    model.netG.train()
-    if args.two_stages:
-        model.netG_fine.train()
     logging.info(f"Parameter Count: {count_parameters(model.netG)}")
 
     if args.restore_ckpt is not None:
         save_model = torch.load(args.restore_ckpt)
         if args.first_stage_ue and args.ue_method == "ensemble":
             for i in range(len(model.netG_list)):
-                save_model_ensemble = torch.load(model.ensemble_model_names[i])
-                model.netG_list[i].load_state_dict(save_model_ensemble['netG'], strict=True)
+                model_med = torch.load(model.ensemble_model_names[i], map_location='cuda:0')
+                for key in list(model_med['netG'].keys()):
+                    model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
+                for key in list(model_med['netG'].keys()):
+                    if key.startswith('module'):
+                        del model_med['netG'][key]
+                model.netG_list[i].load_state_dict(model_med['netG'], strict=True)
         else:
-            model.netG.load_state_dict(save_model['netG'], strict=False)
+            model_med = torch.load(args.restore_ckpt, map_location='cuda:0')
+            for key in list(model_med['netG'].keys()):
+                model_med['netG'][key.replace('module.','')] = model_med['netG'][key]
+            for key in list(model_med['netG'].keys()):
+                if key.startswith('module'):
+                    del model_med['netG'][key]
+            model.netG.load_state_dict(model_med['netG'], strict=True)
         if save_model['netG_fine'] is not None:
-            model.netG_fine.load_state_dict(save_model['netG_fine'], strict=True)
+            model_med = torch.load(args.restore_ckpt, map_location='cuda:0')
+            for key in list(model_med['netG_fine'].keys()):
+                model_med['netG_fine'][key.replace('module.','')] = model_med['netG_fine'][key]
+            for key in list(model_med['netG_fine'].keys()):
+                if key.startswith('module'):
+                    del model_med['netG_fine'][key]
+            model.netG_fine.load_state_dict(model_med['netG_fine'], strict=True)
         
+    model.setup()
+    model.netG.train()
+    if args.two_stages:
+        model.netG_fine.train()
+
     train_loader = datasets.fetch_dataloader(args, split="train")
     if os.path.exists(os.path.join(args.datasets_folder, args.dataset_name, "extended_queries.h5")):
         extended_loader = datasets.fetch_dataloader(args, split="extended")
