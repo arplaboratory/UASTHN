@@ -120,16 +120,19 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         if not args.identity:
             with torch.no_grad():
                 if not args.ue_method == "augment_ensemble":
-                    # time_start = time.time()
+                    time_start = time.time()
                     model.forward(for_test=True)
-                    # time_end = time.time()
-                    # timeall.append(time_end-time_start)
-                    # print(time_end-time_start)
+                    time_end = time.time()
+                    timeall.append(time_end-time_start)
+                    print(time_end-time_start)
                     four_pred = model.four_pred
                 
                 else:
+                    time_start = time.time()
                     for model_single in model:
                         model_single.forward(for_test=True)
+                    time_end = time.time()
+                    timeall.append(time_end-time_start)
                     four_pred = model[0].four_pred
         else:
             four_pred = torch.zeros((flow_gt.shape[0], 2, 2, 2))

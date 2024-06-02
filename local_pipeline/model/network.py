@@ -101,7 +101,7 @@ class IHN(nn.Module):
 
         return coords0, coords1
 
-    def forward(self, image1, image2, iters_lev0 = 6, iters_lev1=3, corr_level=2, corr_radius=4, early_stop=-1):
+    def forward(self, image1, image2, iters_lev0 = 6, iters_lev1=6, corr_level=2, corr_radius=4, early_stop=-1):
         # image1 = 2 * (image1 / 255.0) - 1.0
         # image2 = 2 * (image2 / 255.0) - 1.0
         if self.imagenet_mean is None:
@@ -109,7 +109,6 @@ class IHN(nn.Module):
             self.imagenet_std = torch.Tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(image1.device)
         image1 = (image1.contiguous() - self.imagenet_mean) / self.imagenet_std
         image2 = (image2.contiguous() - self.imagenet_mean) / self.imagenet_std
-
         # time1 = time.time()
         with autocast(enabled=self.args.mixed_precision):
             # fmap1_64, fmap1_128 = self.fnet1(image1)
@@ -258,11 +257,12 @@ class UAGL():
             self.netG_fine = self.init_net(self.netG_fine)
 
     def init_net(self, model):
-        model = torch.nn.DataParallel(model)
-        if torch.cuda.device_count() >= 2:
-            # When using more than 1GPU, use sync_batchnorm for torch.nn.DataParallel
-            model = convert_model(model)
-            model = model.to(self.device)
+        # model = torch.nn.DataParallel(model)
+        # if torch.cuda.device_count() >= 2:
+        #     # When using more than 1GPU, use sync_batchnorm for torch.nn.DataParallel
+        #     model = convert_model(model)
+        #     model = model.to(self.device)
+        model = model.to(self.device)
         return model
     
     def set_input(self, A, B, flow_gt=None, neg_A=None):
@@ -296,7 +296,7 @@ class UAGL():
                 if self.args.ue_method == "augment_ensemble":
                     four_preds_list, _ = self.netG_list[0](image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level, early_stop=self.args.check_step)
                 else:
-                    four_preds_list, _ = self.netG_list[0](image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level, early_stop=-1)
+                    four_preds_list, _ = self.netG_list[0](image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level)
                 four_preds_list_ensemble.append(four_preds_list)
                 for i in range(1, len(self.netG_list)):
                     four_preds_list, _ = self.netG_list[i](image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level, early_stop=self.args.check_step)
@@ -513,14 +513,14 @@ class UAGL():
         return bbox_s
 
     def ue_aggregation(self, four_preds_list, alpha, for_training, check_step=-1):
+        if check_step == -1:
+            agg_step = self.args.iters_lev0
+        else:
+            agg_step = check_step + 1
         if self.ue_method == "augment":
             if self.args.ue_aug_method == "shift":
                 # Recover shift
                 four_preds_recovered_list = []
-                if check_step == -1:
-                    agg_step = self.args.iters_lev0
-                else:
-                    agg_step = check_step + 1
                 for i in range(agg_step):
                     four_point_org_single_repeat = self.four_point_org_single.repeat(four_preds_list[i].shape[0],1,1,1)
                     four_corners = four_preds_list[i] + four_point_org_single_repeat # B x 2 x 2 x 2
@@ -532,6 +532,8 @@ class UAGL():
                     four_corners = four_corners[:,:2,:] / four_corners[:,2:,:] # B x 2 x 4
                     four_preds_recovered_single = four_corners.view(four_corners.shape[0], 2, 2, 2) - four_point_org_single_repeat
                     four_preds_recovered_list.append(four_preds_recovered_single)
+                for i in range(agg_step, len(four_preds_list)):
+                    four_preds_recovered_list.append(four_preds_list[i])
                 four_preds_list = four_preds_recovered_list
         four_pred = four_preds_list[check_step]
         if self.ue_method == "ensemble":
@@ -560,22 +562,31 @@ class UAGL():
             print(mace_distance)
         else:
             std_four_pred_five_crops = torch.std(four_pred_five_crops, dim=1)
-        mean_four_pred_five_crops = torch.mean(four_pred_five_crops, dim=1)
-        four_pred_agg_list = []
-        for i in range(len(four_pred_five_crops)):
-            if self.args.ue_agg == "mean":
-                four_pred_agg = mean_four_pred_five_crops[i]
-            elif self.args.ue_agg == "zero":
-                four_pred_agg = four_pred_five_crops[i, 0]
-            four_pred_agg_list.append(four_pred_agg)
-        four_pred_new = torch.stack(four_pred_agg_list)
+        if check_step == -1:
+            mean_four_pred_five_crops = torch.mean(four_pred_five_crops, dim=1)
+            four_pred_agg_list = []
+            for i in range(len(four_pred_five_crops)):
+                if self.args.ue_agg == "mean":
+                    four_pred_agg = mean_four_pred_five_crops[i]
+                elif self.args.ue_agg == "zero":
+                    four_pred_agg = four_pred_five_crops[i, 0]
+                four_pred_agg_list.append(four_pred_agg)
+            four_pred_new = torch.stack(four_pred_agg_list)
+        else:
+            four_pred_new = four_preds_list[-1]
         # four_preds_list_new = []
         four_preds_std_list_new = []
         for i in range(len(four_preds_list)):
-            if self.ue_method == "ensemble":
-                four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//len(self.netG_list), len(self.netG_list), 2, 2, 2)
-            elif self.ue_method == "augment":
-                four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
+            if i < agg_step:
+                if self.ue_method == "ensemble":
+                    four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//len(self.netG_list), len(self.netG_list), 2, 2, 2)
+                elif self.ue_method == "augment":
+                    four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0]//self.args.ue_num_crops, self.args.ue_num_crops, 2, 2, 2)
+            else:
+                if self.ue_method == "ensemble":
+                    four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0], 1, 2, 2, 2)
+                elif self.ue_method == "augment":
+                    four_pred_single = four_preds_list[i].view(four_preds_list[i].shape[0], 1, 2, 2, 2)
             # Mean for training
             std_four_pred_single = torch.std(four_pred_single, dim=1)
             # mean_four_pred_single = torch.mean(four_pred_single, dim=1)
