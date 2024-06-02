@@ -143,7 +143,7 @@ def warp(x, flo):
     return output * mask
 
 
-def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None):
+def sequence_loss(four_preds, four_pred, flow_gt, gamma, args, metrics, four_ue_list=None):
     """ Loss function defined over sequence of flow predictions """
 
     if args.first_stage_ue and args.ue_method == "augment":
@@ -189,10 +189,14 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None):
             i_weight = gamma ** (args.iters_lev1 + args.iters_lev0 - i - 1)
             i4cor_loss = (four_preds[i] - flow_4cor).abs()
             ce_loss += i_weight * (i4cor_loss).mean()
+        mace = torch.sum((four_preds[-1] - flow_4cor) ** 2, dim=1).sqrt()
+    elif args.first_stage_ue and args.ue_method == "augment":
+        mace = torch.sum((four_pred - flow_4cor) ** 2, dim=1).sqrt()
+    else:
+        mace = torch.sum((four_preds[-1] - flow_4cor) ** 2, dim=1).sqrt()
 
     metrics['ce_loss'] = ce_loss.item()
 
-    mace = torch.sum((four_preds[-1] - flow_4cor) ** 2, dim=1).sqrt()
     metrics['1px'] = (mace < 1).float().mean().item()
     metrics['3px'] = (mace < 3).float().mean().item()
     metrics['mace'] = mace.mean().item()
@@ -200,7 +204,7 @@ def sequence_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None):
     return ce_loss, metrics
 
 
-def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None):
+def single_loss(four_preds, four_pred, flow_gt, gamma, args, metrics, four_ue_list=None):
     """ Loss function defined over sequence of flow predictions """
 
     if args.first_stage_ue and args.ue_method == "augment":
@@ -229,7 +233,7 @@ def single_loss(four_preds, flow_gt, gamma, args, metrics, four_ue_list=None):
     else:
         ce_loss = (four_preds[0] - flow_4cor).abs().mean()
         
-    mace = torch.sum((four_preds[0] - flow_4cor) ** 2, dim=1).sqrt()
+    mace = torch.sum((four_pred - flow_4cor) ** 2, dim=1).sqrt()
     metrics['1px'] = (mace < 1).float().mean().item()
     metrics['3px'] = (mace < 3).float().mean().item()
     metrics['mace'] = mace.mean().item()

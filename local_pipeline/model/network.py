@@ -616,9 +616,9 @@ class UAGL():
         """Calculate GAN and L1 loss for the generator"""
         # Second, G(A) = B
         if self.ue_method == "single":
-            self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue_list=self.four_pred_ue_list) 
+            self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.four_pred, self.flow_gt, self.args.gamma, self.args, self.metrics, four_ue_list=self.four_pred_ue_list) 
         else:
-            self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.flow_gt, self.args.gamma, self.args, self.metrics) 
+            self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.four_pred, self.flow_gt, self.args.gamma, self.args, self.metrics) 
         # combine loss and calculate gradients
         self.loss_G = self.loss_G_Homo
         self.metrics["G_loss"] = self.loss_G.cpu().item()
