@@ -293,8 +293,10 @@ class UAGL():
         if self.args.first_stage_ue:
             if self.ue_method == "ensemble":
                 four_preds_list_ensemble = []
-                for netG in self.netG_list:
-                    four_preds_list, _ = netG(image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level, early_stop=self.args.check_step)
+                four_preds_list, _ = self.netG_list[i](image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level, early_stop=self.args.check_step)
+                four_preds_list_ensemble.append(four_preds_list)
+                for i in range(1, len(self.netG_list)):
+                    four_preds_list, _ = self.netG_list[i](image1=self.image_1, image2=self.image_2, iters_lev0=self.args.iters_lev0, corr_level=self.args.corr_level, early_stop=self.args.check_step)
                     four_preds_list_ensemble.append(four_preds_list)
                 self.four_preds_list, self.four_pred = self.stack_ensemble_results(four_preds_list_ensemble, self.args.check_step)
             elif self.ue_method == "single":
@@ -452,10 +454,10 @@ class UAGL():
         alpha = self.args.database_size / self.args.resize_width
         if not neg_forward:
             four_preds_list, four_pred, self.std_four_preds_list, self.std_four_pred_five_crops = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
-            print("Positve UE std: " + str((self.std_four_pred_five_crops[0])))
+            # print("Positve UE std: " + str((self.std_four_pred_five_crops[0]))) # Comment for performance evaluation
         else:
             four_preds_list, four_pred, self.std_four_preds_neg_list, self.std_four_pred_five_crops_neg = self.ue_aggregation(four_preds_list, alpha, for_training, self.args.check_step)
-            print("Negative UE std: " + str((self.std_four_pred_five_crops_neg[0])))
+            # print("Negative UE std: " + str((self.std_four_pred_five_crops_neg[0]))) # Comment for performance evaluation
         return four_preds_list, four_pred
 
     def first_stage_ue_generate_bbox(self):
