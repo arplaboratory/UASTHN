@@ -267,7 +267,7 @@ class UAGL():
         self.image_2 = B.to(self.device, non_blocking=True)
         self.flow_gt = flow_gt.to(self.device, non_blocking=True)
         if self.flow_gt is not None:
-            self.real_warped_image_2 = mywarp(self.image_2, self.flow_gt, self.four_point_org_single) # Comment for performance evaluation 
+            # self.real_warped_image_2 = mywarp(self.image_2, self.flow_gt, self.four_point_org_single) # Comment for performance evaluation 
             self.flow_4cor = torch.zeros((self.flow_gt.shape[0], 2, 2, 2)).to(self.flow_gt.device)
             self.flow_4cor[:, :, 0, 0] = self.flow_gt[:, :, 0, 0]
             self.flow_4cor[:, :, 0, 1] = self.flow_gt[:, :, 0, -1]
@@ -305,15 +305,16 @@ class UAGL():
             #     self.four_preds_list[i] = self.flow_4cor # DEBUG
             # self.four_pred = self.flow_4cor # DEBUG
             if self.ue_method == "augment":
-                self.fake_warped_image_2_multi_before = mywarp(self.image_2, self.four_preds_list[self.args.check_step], self.four_point_org_single) # Comment for performance evaluation 
+                pass
+                # self.fake_warped_image_2_multi_before = mywarp(self.image_2, self.four_preds_list[self.args.check_step], self.four_point_org_single) # Comment for performance evaluation 
             if self.ue_method != "single":
                 self.four_preds_list, self.four_pred = self.first_stage_ue_aggregation(self.four_preds_list, for_training)
             if self.ue_method == "augment":
                 B5, C, H, W = self.image_2.shape
-                image_2_full = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, :1].repeat(1, self.args.ue_num_crops, 1, 1, 1).view(-1, C, H, W)
-                self.fake_warped_image_2_multi_after = mywarp(image_2_full, self.four_preds_list[self.args.check_step], self.four_point_org_single) # Comment for performance evaluation
-                self.image_1_multi = self.image_1
-                self.image_2_multi = self.image_2
+                # image_2_full = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, :1].repeat(1, self.args.ue_num_crops, 1, 1, 1).view(-1, C, H, W) # Comment for performance evaluation
+                # self.fake_warped_image_2_multi_after = mywarp(image_2_full, self.four_preds_list[self.args.check_step], self.four_point_org_single) # Comment for performance evaluation
+                # self.image_1_multi = self.image_1 # Comment for performance evaluation
+                # self.image_2_multi = self.image_2 # Comment for performance evaluation
                 self.image_1 = self.image_1.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
                 self.image_2 = self.image_2.view(B5//self.args.ue_num_crops, self.args.ue_num_crops, C, H, W)[:, 0]
             elif self.ue_method == "single":
@@ -340,7 +341,7 @@ class UAGL():
             self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox, for_training)
             # print(self.four_pred[0])
             # raise KeyError()
-        self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
+        # self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
 
     def forward_neg(self, for_training=False):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""

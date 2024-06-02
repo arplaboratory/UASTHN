@@ -74,25 +74,25 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
             image1, image2, flow, _, query_utm, database_utm, _, _  = [x for x in data_blob]
             model.set_input(image1, image2, flow)
         metrics = model.optimize_parameters()
-        if i_batch==0:
-            save_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1.png')
-            if args.first_stage_ue:
-                if args.ue_method == "augment":
-                    save_img(torchvision.utils.make_grid(model.image_1_multi, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_multi.png')
-                    save_img(torchvision.utils.make_grid(model.image_2_multi, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_multi.png')
-            if args.neg_training:
-                save_img(torchvision.utils.make_grid(model.image_1_neg, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_neg.png')
-            save_img(torchvision.utils.make_grid(model.image_2, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2.png')
-            save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
-                             torchvision.utils.make_grid(model.real_warped_image_2, nrow=16, padding = 16, pad_value=0), 
-                             args.save_dir + '/train_overlap_gt.png')
-        if i_batch==0:
-            save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
-                            torchvision.utils.make_grid(model.fake_warped_image_2, nrow=16, padding = 16, pad_value=0),
-                            args.save_dir + f'/train_overlap_pred.png')
-            if args.two_stages:
-                save_img(torchvision.utils.make_grid(model.image_1_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_crop.png')
-                save_img(torchvision.utils.make_grid(model.image_2_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_crop.png')
+        # if i_batch==0:
+        #     save_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1.png')
+        #     if args.first_stage_ue:
+        #         if args.ue_method == "augment":
+        #             save_img(torchvision.utils.make_grid(model.image_1_multi, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_multi.png')
+        #             save_img(torchvision.utils.make_grid(model.image_2_multi, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_multi.png')
+        #     if args.neg_training:
+        #         save_img(torchvision.utils.make_grid(model.image_1_neg, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_neg.png')
+        #     save_img(torchvision.utils.make_grid(model.image_2, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2.png')
+        #     save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
+        #                      torchvision.utils.make_grid(model.real_warped_image_2, nrow=16, padding = 16, pad_value=0), 
+        #                      args.save_dir + '/train_overlap_gt.png')
+        # if i_batch==0:
+        #     save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
+        #                     torchvision.utils.make_grid(model.fake_warped_image_2, nrow=16, padding = 16, pad_value=0),
+        #                     args.save_dir + f'/train_overlap_pred.png')
+        #     if args.two_stages:
+        #         save_img(torchvision.utils.make_grid(model.image_1_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_crop.png')
+        #         save_img(torchvision.utils.make_grid(model.image_2_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_crop.png')
         model.update_learning_rate()
         if torch.isnan(model.loss_G):
             weights = model.optimizer_G.param_groups[0]['params']
