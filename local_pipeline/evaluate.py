@@ -40,8 +40,12 @@ def validate_process(model, args, total_steps):
         flow_4cor[:, :, 0, 1] = flow_gt[:, :, 0, -1]
         flow_4cor[:, :, 1, 0] = flow_gt[:, :, -1, 0]
         flow_4cor[:, :, 1, 1] = flow_gt[:, :, -1, -1]
-        image1 = image1.to(model.netG.module.device)
-        image2 = image2.to(model.netG.module.device)
+        if hasattr(model.netG, "module"):
+            device = model.netG.module.device
+        else:
+            device = model.netG.device
+        image1 = image1.to(device)
+        image2 = image2.to(device)
         model.set_input(image1, image2, flow_gt)
         with torch.no_grad():
             model.forward()
