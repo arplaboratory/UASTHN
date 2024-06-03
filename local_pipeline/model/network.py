@@ -514,7 +514,7 @@ class UAGL():
 
     def ue_aggregation(self, four_preds_list, alpha, for_training, check_step=-1):
         if check_step == -1:
-            agg_step = self.args.iters_lev0
+            agg_step = len(four_preds_list)
         else:
             agg_step = check_step + 1
         if self.ue_method == "augment":
@@ -597,7 +597,7 @@ class UAGL():
     def stack_ensemble_results(self, four_preds_list_ensemble, early_stop):
         four_preds_list = []
         if early_stop == -1:
-            agg_step = self.args.iters_lev0
+            agg_step = len(four_preds_list_ensemble[0])
         else:
             agg_step = early_stop + 1
         for i in range(agg_step):
