@@ -45,7 +45,7 @@ def main(args):
                 if key.startswith('module'):
                     del model_med['netG'][key]
             model.netG.load_state_dict(model_med['netG'], strict=True)
-        if save_model['netG_fine'] is not None:
+        if args.two_stages and save_model['netG_fine'] is not None:
             model_med = torch.load(args.restore_ckpt, map_location='cuda:0')
             for key in list(model_med['netG_fine'].keys()):
                 model_med['netG_fine'][key.replace('module.','')] = model_med['netG_fine'][key]
