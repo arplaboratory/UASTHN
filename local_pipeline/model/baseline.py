@@ -3,7 +3,7 @@ import torch
 from model.ATT.attention_layer import Correlation, AttentionLayer
 import torch.nn.functional as F
 class DHN(nn.Module):
-    def __init__(self, args, first_stage, ue_method):
+    def __init__(self, args, first_stage, ue_method="none"):
         super().__init__()
         self.device = torch.device('cuda:' + str(args.gpuid[0]))
         self.args = args
@@ -43,7 +43,7 @@ class DHN(nn.Module):
         else:
             self.fc2 = nn.Linear(1024,8)
 
-    def forward(self, image1, image2, iters_lev0 = 6, iters_lev1=3, corr_level=2, corr_radius=4):
+    def forward(self, image1, image2, iters_lev0 = 6, iters_lev1=3, corr_level=2, corr_radius=4, early_stop=-1):
         # image1 = 2 * (image1 / 255.0) - 1.0
         # image2 = 2 * (image2 / 255.0) - 1.0
         image1 = image1.contiguous()
