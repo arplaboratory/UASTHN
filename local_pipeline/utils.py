@@ -152,13 +152,13 @@ def sequence_loss(four_preds, four_pred, flow_gt, gamma, args, metrics, four_ue_
         flow_4cor[:, :, 0, 1] = flow_gt[:, :, 0, -1]
         flow_4cor[:, :, 1, 0] = flow_gt[:, :, -1, 0]
         flow_4cor[:, :, 1, 1] = flow_gt[:, :, -1, -1]
-        flow_4cor_repeat = torch.zeros((four_preds[0].shape[0], 2, 2, 2)).to(four_preds[0].device)
+        flow_4cor_repeat = torch.zeros((four_preds[0].shape[0]//args.ue_num_crops, args.ue_num_crops, 2, 2, 2)).to(four_preds[0].device)
         _, C, H, W= flow_gt.shape
-        flow_gt_repeat = flow_gt.view(four_preds[0].shape[0]//args.ue_num_crops, 1, C, H, W).repeat(1, args.ue_num_crops, 1, 1, 1).view(-1, C, H, W)
-        flow_4cor_repeat[:, :, 0, 0] = flow_gt_repeat[:, :, 0, 0]
-        flow_4cor_repeat[:, :, 0, 1] = flow_gt_repeat[:, :, 0, -1]
-        flow_4cor_repeat[:, :, 1, 0] = flow_gt_repeat[:, :, -1, 0]
-        flow_4cor_repeat[:, :, 1, 1] = flow_gt_repeat[:, :, -1, -1]
+        flow_gt_repeat = flow_gt.view(four_preds[0].shape[0]//args.ue_num_crops, 1, C, H, W).repeat(1, args.ue_num_crops, 1, 1, 1)
+        flow_4cor_repeat[:, :, :, 0, 0] = flow_gt_repeat[:, :, :, 0, 0]
+        flow_4cor_repeat[:, :, :, 0, 1] = flow_gt_repeat[:, :, :, 0, -1]
+        flow_4cor_repeat[:, :, :, 1, 0] = flow_gt_repeat[:, :, :, -1, 0]
+        flow_4cor_repeat[:, :, :, 1, 1] = flow_gt_repeat[:, :, :, -1, -1]
     else:
         flow_4cor = torch.zeros((four_preds[0].shape[0], 2, 2, 2)).to(four_preds[0].device)
         flow_4cor[:, :, 0, 0] = flow_gt[:, :, 0, 0]
@@ -176,8 +176,10 @@ def sequence_loss(four_preds, four_pred, flow_gt, gamma, args, metrics, four_ue_
     elif args.first_stage_ue and args.ue_method == "augment":
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
-            i4cor_loss = (four_preds[i] - flow_4cor_repeat).abs()
-            ce_loss += i_weight * (i4cor_loss).mean()
+            four_pred_reshape = four_preds[i].view(four_preds[i].shape[0]//args.ue_num_crops, args.ue_num_crops, 2, 2, 2)
+            i4cor_loss_ori = args.ue_lambda_tta * (four_pred_reshape[:, :1] - flow_4cor_repeat[:, :1]).abs()
+            i4cor_loss = args.ue_lambda_tta * (four_pred_reshape[:, 1:] - flow_4cor_repeat[:, 1:]).abs()
+            ce_loss += i_weight * (torch.cat([i4cor_loss_ori, i4cor_loss], dim=1)).mean()
     else:
         for i in range(args.iters_lev0):
             i_weight = gamma ** (args.iters_lev0 - i - 1)
@@ -213,13 +215,13 @@ def single_loss(four_preds, four_pred, flow_gt, gamma, args, metrics, four_ue_li
         flow_4cor[:, :, 0, 1] = flow_gt[:, :, 0, -1]
         flow_4cor[:, :, 1, 0] = flow_gt[:, :, -1, 0]
         flow_4cor[:, :, 1, 1] = flow_gt[:, :, -1, -1]
-        flow_4cor_repeat = torch.zeros((four_preds[0].shape[0], 2, 2, 2)).to(four_preds[0].device)
+        flow_4cor_repeat = torch.zeros((four_preds[0].shape[0]//args.ue_num_crops, args.ue_num_crops, 2, 2, 2)).to(four_preds[0].device)
         _, C, H, W= flow_gt.shape
-        flow_gt_repeat = flow_gt.view(four_preds[0].shape[0]//args.ue_num_crops, 1, C, H, W).repeat(1, args.ue_num_crops, 1, 1, 1).view(-1, C, H, W)
-        flow_4cor_repeat[:, :, 0, 0] = flow_gt_repeat[:, :, 0, 0]
-        flow_4cor_repeat[:, :, 0, 1] = flow_gt_repeat[:, :, 0, -1]
-        flow_4cor_repeat[:, :, 1, 0] = flow_gt_repeat[:, :, -1, 0]
-        flow_4cor_repeat[:, :, 1, 1] = flow_gt_repeat[:, :, -1, -1]
+        flow_gt_repeat = flow_gt.view(four_preds[0].shape[0]//args.ue_num_crops, 1, C, H, W).repeat(1, args.ue_num_crops, 1, 1, 1)
+        flow_4cor_repeat[:, :, :, 0, 0] = flow_gt_repeat[:, :, :, 0, 0]
+        flow_4cor_repeat[:, :, :, 0, 1] = flow_gt_repeat[:, :, :, 0, -1]
+        flow_4cor_repeat[:, :, :, 1, 0] = flow_gt_repeat[:, :, :, -1, 0]
+        flow_4cor_repeat[:, :, :, 1, 1] = flow_gt_repeat[:, :, :, -1, -1]
     else:
         flow_4cor = torch.zeros((four_preds[0].shape[0], 2, 2, 2)).to(four_preds[0].device)
         flow_4cor[:, :, 0, 0] = flow_gt[:, :, 0, 0]
@@ -230,6 +232,12 @@ def single_loss(four_preds, four_pred, flow_gt, gamma, args, metrics, four_ue_li
     if args.first_stage_ue and args.ue_method == "single":
         assert four_ue_list is not None
         ce_loss = ((four_preds[0] - flow_4cor)**2*torch.exp(-four_ue_list[0])/2 + four_ue_list[0]/2).mean()
+    elif args.first_stage_ue and args.ue_method == "augment":
+        four_pred_reshape = four_preds[0].view(four_preds[0].shape[0]//args.ue_num_crops, args.ue_num_crops, 2, 2, 2)
+        i4cor_loss_ori = args.ue_lambda_tta * (four_pred_reshape[:, :1] - flow_4cor_repeat[:, :1]).abs()
+        i4cor_loss = args.ue_lambda_tta * (four_pred_reshape[:, 1:] - flow_4cor_repeat[:, 1:]).abs()
+        ce_loss += (torch.cat([i4cor_loss_ori, i4cor_loss], dim=1)).mean()
+        ce_loss = (four_preds[0] - flow_4cor_repeat).abs().mean()
     else:
         ce_loss = (four_preds[0] - flow_4cor).abs().mean()
         
