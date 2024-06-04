@@ -236,8 +236,7 @@ def single_loss(four_preds, four_pred, flow_gt, gamma, args, metrics, four_ue_li
         four_pred_reshape = four_preds[0].view(four_preds[0].shape[0]//args.ue_num_crops, args.ue_num_crops, 2, 2, 2)
         i4cor_loss_ori = args.ue_lambda_tta * (four_pred_reshape[:, :1] - flow_4cor_repeat[:, :1]).abs()
         i4cor_loss = args.ue_lambda_tta * (four_pred_reshape[:, 1:] - flow_4cor_repeat[:, 1:]).abs()
-        ce_loss += (torch.cat([i4cor_loss_ori, i4cor_loss], dim=1)).mean()
-        ce_loss = (four_preds[0] - flow_4cor_repeat).abs().mean()
+        ce_loss = (torch.cat([i4cor_loss_ori, i4cor_loss], dim=1)).mean()
     else:
         ce_loss = (four_preds[0] - flow_4cor).abs().mean()
         
