@@ -1,55 +1,60 @@
 #!/bin/bash
 
-## NORMAL
-# sbatch ./scripts/local/train_local_dense_extended.sbatch
-# sbatch ./scripts/local/train_local_dense.sbatch
+# Ensemble
+# Baseline without UE directly uses the model with seed=0
+for i in {0..4}
+do
+    sbatch --export=ALL,SEED="$i" scripts/local_largest_1536/train_local_sparse_512_extended_long.sbatch
+    sbatch --export=ALL,SEED="$i" scripts/local_largest_1536/train_local_sparse_512_extended_long_dhn.sbatch
+    sbatch --export=ALL,SEED="$i" scripts/local_largest_1536/train_local_sparse_256_extended_long_load_f_aug64_c.sbatch
+    echo "$i"
+done
 
-# sbatch ./scripts/local/train_local_sparse_64_extended.sbatch
-# sbatch ./scripts/local/train_local_sparse_128_extended.sbatch
-# sbatch ./scripts/local/train_local_sparse_256_extended.sbatch
-# sbatch ./scripts/local/train_local_sparse_64.sbatch
-# sbatch ./scripts/local/train_local_sparse_128.sbatch
-# sbatch ./scripts/local/train_local_sparse_256.sbatch
-# sbatch ./scripts/local/train_local_sparse_512.sbatch
-# sbatch ./scripts/local/train_local_sparse_512_extended.sbatch
+for i in {0..4}
+do
+    sbatch --export=ALL,SEED="$i" scripts/local_largest_1536/train_local_sparse_256_extended_long.sbatch
+    sbatch --export=ALL,SEED="$i" scripts/local_largest_1536/train_local_sparse_256_extended_long_load_f_aug64_c.sbatch
+    sbatch --export=ALL,SEED="$i" scripts/local_largest_1536/train_local_sparse_256_extended_long_dhn.sbatch
+    echo "$i"
+done
 
-## LARGE
-# sbatch ./scripts/local_large/train_local_dense_extended.sbatch
-# sbatch ./scripts/local_large/train_local_sparse_64_extended.sbatch
-# sbatch ./scripts/local_large/train_local_sparse_128_extended.sbatch
-# sbatch ./scripts/local_large/train_local_sparse_256_extended_long.sbatch
-# sbatch ./scripts/local_large/train_local_sparse_512_extended_long.sbatch
+for i in {0..4}
+do
+    sbatch --export=ALL,SEED="$i" scripts/local_largest_1536/train_local_sparse_128_extended_long.sbatch
+    sbatch --export=ALL,SEED="$i" scripts/local_largest_1536/train_local_sparse_128_extended_long_load_f_aug64_c.sbatch
+    sbatch --export=ALL,SEED="$i" scripts/local_largest_1536/train_local_sparse_128_extended_long_dhn.sbatch
+    echo "$i"
+done
 
-## LARGER
-# sbatch scripts/local_larger/train_local_dense_extended.sbatch
-# sbatch scripts/local_larger/train_local_sparse_64_extended.sbatch
-# sbatch scripts/local_larger/train_local_sparse_128_extended.sbatch
-# sbatch scripts/local_larger/train_local_sparse_256_extended_long.sbatch
-# sbatch scripts/local_larger/train_local_sparse_512_extended_long.sbatch
+# TTA ablation study
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_load_f_aug64_c_ue1g16_ft5.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_load_f_aug64_c_ue1g32_ft5.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_load_f_aug64_c_ue1g64_ft5.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_load_f_aug64_c_ue1r16_ft5.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_load_f_aug64_c_ue1r32_ft5.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_load_f_aug64_c_ue1r64_ft3.sbatch
 
-## LARGER Permute
-# sbatch scripts/local_larger_permute/train_local_sparse_512_extended_long.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_load_f_aug64_c_ue1r32_ft3.sbatch
 
-## 2 stage
-# sbatch scripts/local_larger_2/train_local_dense_extended_load_f_aug64_c.sbatch
-# sbatch scripts/local_larger_2/train_local_sparse_64_extended_load_f_aug64_c.sbatch
-# sbatch scripts/local_larger_2/train_local_sparse_128_extended_load_f_aug64_c.sbatch
-# sbatch scripts/local_larger_2/train_local_sparse_256_extended_long_load_f_aug64_c.sbatch
-# sbatch scripts/local_larger_2/train_local_sparse_512_extended_long_load_f_aug64_c.sbatch
+# Direct Modeling
+sbatch scripts/local_largest_1536/train_local_sparse_128_extended_long_dhn_single.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_128_extended_long_load_f_aug64_c_single.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_128_extended_long_single.sbatch
 
-## 2 stage permute
-# sbatch scripts/local_larger_permute/train_local_sparse_512_extended_long_load_f_aug64_c.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_256_extended_long_dhn_single.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_256_extended_long_load_f_aug64_c_single.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_256_extended_long_single.sbatch
 
-# 2048
-sbatch scripts/local_largest_2048/train_local_dense_extended.sbatch
-sbatch scripts/local_largest_2048/train_local_sparse_64_extended.sbatch
-sbatch scripts/local_largest_2048/train_local_sparse_128_extended.sbatch
-sbatch scripts/local_largest_2048/train_local_sparse_256_extended_long.sbatch
-sbatch scripts/local_largest_2048/train_local_sparse_512_extended_long.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_dhn_single.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_single.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_load_f_aug64_c_single.sbatch
 
-# 2560
-sbatch scripts/local_largest_2560/train_local_dense_extended.sbatch
-sbatch scripts/local_largest_2560/train_local_sparse_64_extended.sbatch
-sbatch scripts/local_largest_2560/train_local_sparse_128_extended.sbatch
-sbatch scripts/local_largest_2560/train_local_sparse_256_extended_long.sbatch
-sbatch scripts/local_largest_2560/train_local_sparse_512_extended_long.sbatch
+# TTA test
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_dhn_ue1r32.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_256_extended_long_dhn_ue1r32.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_128_extended_long_dhn_ue1r32.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_512_extended_long_ue1r32.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_256_extended_long_ue1r32.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_128_extended_long_ue1r32.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_256_extended_long_load_f_aug64_c_ue1r32.sbatch
+sbatch scripts/local_largest_1536/train_local_sparse_128_extended_long_load_f_aug64_c_ue1r32.sbatch

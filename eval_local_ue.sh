@@ -1,258 +1,462 @@
 #!/bin/bash
 
-eval "$(conda shell.bash hook)"
-conda activate UAGL
-
-submit_job_ensemble_aug() {
-    local STDM=$1
-    local IT0=$2
-    local IT1=$3
-    local MODEL=$4
-
-    local SHIFT_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_e_aug.sbatch"
-
-    sbatch --export=ALL,DC=512,USEED=0,STDM=$STDM,AGG=zero,CS=-1,IT0=$IT0,IT1=$IT1,MODEL=$MODEL $SHIFT_SCRIPT
-}
-
 submit_job_ensemble() {
-    local STDM=$1
-    local IT0=$2
-    local IT1=$3
+    local DC=$1
+    local EN=$2
+    local ARCH=$3
     local MODEL=$4
+    local METHOD=$5
 
-    local SHIFT_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_e.sbatch"
-
-    sbatch --export=ALL,DC=512,USEED=0,STDM=$STDM,AGG=zero,CS=-1,IT0=$IT0,IT1=$IT1,MODEL=$MODEL $SHIFT_SCRIPT
-}
-
-submit_job_shift() {
-    local ST=$1
-    local SHIFT=$2
-    local STDM=$3
-    local IT0=$4
-    local IT1=$5
-    local MODEL=$6
-
-    local SHIFT_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_s.sbatch"
-
-    sbatch --export=ALL,DC=512,ST=$ST,SHIFT=$SHIFT,USEED=0,STDM=$STDM,AGG=zero,CS=-1,IT0=$IT0,IT1=$IT1,MODEL=$MODEL $SHIFT_SCRIPT
-}
-
-submit_job_shift_aug() {
-    local ST=$1
-    local SHIFT=$2
-    local STDM=$3
-    local IT0=$4
-    local IT1=$5
-    local DEG=$6
-    local MODEL=$7
-
-    if [ "$DEG" = 1 ]; then
-        local SHIFT_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_s_aug.sbatch"
-    elif [ "$DEG" = 2 ]; then 
-        local SHIFT_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_val_pm.sbatch"
+    if [ "$METHOD" = 1 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_e_val.sbatch"
+    elif [ "$METHOD" = 2 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_e.sbatch"
+    elif [ "$METHOD" = 3 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_esthn.sbatch"
+    elif [ "$METHOD" = 4 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_eone.sbatch"
     else
-        local SHIFT_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_val_pl.sbatch"
+        exit 0
     fi
 
-    sbatch --export=ALL,DC=512,ST=$ST,SHIFT=$SHIFT,USEED=0,STDM=$STDM,AGG=zero,CS=-1,IT0=$IT0,IT1=$IT1,MODEL=$MODEL $SHIFT_SCRIPT
+    sbatch --export=ALL,DC=$DC,USEED=0,STDM=all,AGG=mean,CS=-1,MODEL=$MODEL,EN=$EN,ARCH=$ARCH $EVAL_SCRIPT
 }
 
-submit_job_shift_mock() {
-    local ST=$1
-    local SHIFT=$2
-    local STDM=$3
-    local IT0=$4
-    local IT1=$5
-    local MODEL=$6
+submit_job_single() {
+    local DC=$1
+    local ARCH=$2
+    local MODEL=$3
+    local METHOD=$4
 
-    local SHIFT_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_val_mock.sbatch"
+    if [ "$METHOD" = 1 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_d_val.sbatch"
+    elif [ "$METHOD" = 2 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_d.sbatch"
+    elif [ "$METHOD" = 3 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_dsthn.sbatch"
+    elif [ "$METHOD" = 4 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_done.sbatch"
+    else
+        exit 0
+    fi
 
-    sbatch --export=ALL,DC=512,ST=$ST,SHIFT=$SHIFT,USEED=0,STDM=$STDM,AGG=zero,CS=-1,IT0=$IT0,IT1=$IT1,MODEL=$MODEL $SHIFT_SCRIPT
+    sbatch --export=ALL,DC=$DC,USEED=0,STDM=all,AGG=mean,CS=-1,MODEL=$MODEL,ARCH=$ARCH $EVAL_SCRIPT
+}
+
+submit_job_crop() {
+    local DC=$1
+    local ST=$2
+    local SHIFT=$3
+    local ARCH=$4
+    local MODEL=$5
+    local METHOD=$6
+
+    if [ "$METHOD" = 1 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_c_val.sbatch"
+    elif [ "$METHOD" = 2 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_c.sbatch"
+    elif [ "$METHOD" = 3 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_csthn.sbatch"
+    elif [ "$METHOD" = 4 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_cone.sbatch"
+    else
+        exit 0
+    fi
+
+    sbatch --export=ALL,DC=$DC,ST=$ST,SHIFT=$SHIFT,USEED=0,STDM=all,AGG=zero,CS=-1,OUT=$OUT,OUTM=$OUTM,DIS=$DIS,ARCH=$ARCH,MODEL=$MODEL $EVAL_SCRIPT
+}
+
+submit_job_crop_ensemble() {
+    local DC=$1
+    local ST=$2
+    local SHIFT=$3
+    local ARCH=$4
+    local EN=$5
+    local COM=$6
+    local MODEL=$7
+    local METHOD=$8
+
+    if [ "$METHOD" = 1 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_se_val.sbatch"
+    elif [ "$METHOD" = 2 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_se.sbatch"
+    elif [ "$METHOD" = 3 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_sesthn.sbatch"
+    elif [ "$METHOD" = 4 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_ue1_seone.sbatch"
+    else
+        exit 0
+    fi
+
+    sbatch --export=ALL,DC=$DC,ST=$ST,SHIFT=$SHIFT,USEED=0,STDM=all,AGG=zero,CS=-1,OUT=$OUT,OUTM=$OUTM,DIS=$DIS,ARCH=$ARCH,EN=$EN,COM=$COM,MODEL=$MODEL $EVAL_SCRIPT
 }
 
 submit_job_baseline() {
-    local IT0=$1
-    local IT1=$2
-    local MODEL=$3
+    local DC=$1
+    local MODEL=$2
+    local METHOD=$3
 
-    local BASELINE_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_val.sbatch"
+    if [ "$METHOD" = 1 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2_val.sbatch"
+    elif [ "$METHOD" = 2 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_512_extended_2.sbatch"
+    else
+        exit 0
+    fi
 
-    sbatch --export=ALL,DC=512,IT0=$IT0,IT1=$IT1,MODEL=$MODEL $BASELINE_SCRIPT
+    sbatch --export=ALL,DC=$DC,MODEL=$MODEL $BASELINE_SCRIPT
 }
 
 # ################################################################################################################################################################################Train Methods
 
-# # w/o MCT
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-04-27_00-45-46-07ebf9cb-0452-4163-a883-ef4a57b7a5a8"
-# ST=grid
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+# TTA no crop training
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-04-27_00-45-46-07ebf9cb-0452-4163-a883-ef4a57b7a5a8"
+ST=random
+SHIFT=32
+ARCH=IHN
+submit_job_crop $ST $SHIFT $ARCH $MODEL
 
-# # w/ MCT - scratch - 5
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-04-26_22-38-42-c8df956c-7e9b-4419-a1a7-38f119adb90a"
-# ST=grid
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+# #######################################################################################################################################################################################
 
-# # w/ MCT - scratch - 10
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-02_21-52-43-21c6b5c1-c8e4-49cf-b9e7-40d028029219"
-# ST=grid
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_14-57-59-bb6fdc0c-65cb-457a-a562-3a81a63db1d9"
+ST=grid
+SHIFT=64
+ARCH=IHN
+submit_job_crop $ST $SHIFT $ARCH $MODEL
 
-# # w/ MCT -finetune - 5
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-05_01-06-03-864cd069-f433-47ca-b947-f98f9602a562"
-# ST=grid
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+# w/ Crop Training - scratch - 5 - mr
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_14-58-04-5dde4e75-43c9-4ab4-845c-a3947b63abd3"
+ST=random
+SHIFT=64
+ARCH=IHN
+submit_job_crop $ST $SHIFT $ARCH $MODEL
 
-# # w/ MCT -finetune - 10
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-05_01-06-08-186a5cef-53b8-412a-9e9c-9321dbe27597"
-# ST=grid
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+# # ################################################################################################################################################################################Train Methods
 
-# ################################################################################################################################################################################Train Methods
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_14-57-59-6ab9f306-76bc-4c31-bea2-2587eb306447"
+ST=grid
+SHIFT=32
+ARCH=IHN
+submit_job_crop $ST $SHIFT $ARCH $MODEL
 
-# # w/ MCT - scratch - 5
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-10_05-44-08-893060f8-fc8c-4c07-a383-ed4554119eeb"
-# ST=grid
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+# w/ Crop Training - scratch - 5 - mr
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_14-57-59-16ed57bd-e7c3-4575-8421-d180efbbff36"
+ST=random
+SHIFT=32
+ARCH=IHN
+submit_job_crop $ST $SHIFT $ARCH $MODEL
 
-# # w/ MCT - scratch - 10
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-10_06-12-05-0a34633f-9ae9-44a0-897b-bdf6e3396dad"
-# ST=grid
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+# w/ Crop Training - scratch - 3 - mr
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_21-31-21-0e5a3893-b77e-4493-a1af-14809a6a5efb"
+ST=random
+SHIFT=32
+ARCH=IHN
+submit_job_crop $ST $SHIFT $ARCH $MODEL
 
-# # w/ MCT -finetune - 5
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-10_01-06-50-04673ae2-b2e8-483f-8149-029839920a8a"
-# ST=grid
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+# # ################################################################################################################################################################################Train Methods
 
-# # w/ MCT -finetune - 10
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-10_01-15-15-6c285869-f86d-471f-9ffc-0fb5717fbc39"
-# ST=grid
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_14-57-59-4ebb9b13-1d6f-4404-9610-245b9c216c74"
+ST=grid
+SHIFT=16
+ARCH=IHN
+submit_job_crop $ST $SHIFT $ARCH $MODEL
 
-# ############################################################################################################################################ ensemble
+# w/ Crop Training - scratch - 5 - mr
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_14-57-59-1dfa2add-6c74-47c4-a4d4-90dea5d70501"
+ST=random
+SHIFT=16
+ARCH=IHN
+submit_job_crop $ST $SHIFT $ARCH $MODEL
 
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-04-27_00-45-46-07ebf9cb-0452-4163-a883-ef4a57b7a5a8"
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_ensemble $STDM $IT0 $IT1 $MODEL
+# ######################################################################################### DM #######################################
 
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-10_10-30-02-0b459c62-e0b2-4944-b113-27487a3275aa"
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_ensemble_aug $STDM $IT0 $IT1 $MODEL
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-04_23-47-31-1c8b9a7f-8ff4-4916-b38f-a4f17413d0ce/UAGL.pth"
+DC=512
+ARCH=DHN
+submit_job_single $DC $ARCH $MODEL 4
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_15-36-16-14323b3d-a6f2-4898-bb6b-e06eb41a5c1f/UAGL.pth"
+DC=256
+ARCH=DHN
+submit_job_single $DC $ARCH $MODEL 4
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_10-37-23-dbc3cb9d-68ad-4480-8ca7-fd31d19add79/UAGL.pth"
+DC=128
+ARCH=DHN
+submit_job_single $DC $ARCH $MODEL 4
 
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-31_16-49-37-42fac09f-f7a9-4466-a36c-f636e0886d9a/UAGL.pth"
+DC=128
+ARCH=IHN
+submit_job_single $DC $ARCH $MODEL 3
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-31_17-20-32-f938fbaf-54ea-4d53-a045-d7d4a66a72b6/UAGL.pth"
+DC=256
+ARCH=IHN
+submit_job_single $DC $ARCH $MODEL 3
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-31_18-41-34-cba6c674-e614-4550-8566-a24fd8248b2a/UAGL.pth"
+DC=512
+ARCH=IHN
+submit_job_single $DC $ARCH $MODEL 3
 
-# #####################################################################################################################TTA
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-31_16-25-36-30223657-d3df-406f-994e-3b29e5095620/UAGL.pth"
+DC=128
+ARCH=IHN
+submit_job_single $DC $ARCH $MODEL 2
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-31_17-18-30-56d89300-db97-4f4f-b2cd-3804d2c715bd/UAGL.pth"
+DC=256
+ARCH=IHN
+submit_job_single $DC $ARCH $MODEL 2
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-14_07-03-25-2607ed33-70e1-4c35-8adf-7b61d32817aa/UAGL.pth"
+DC=512
+ARCH=IHN
+submit_job_single $DC $ARCH $MODEL 2
 
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-07_17-31-18-ac64936c-2d3d-4487-9a41-6d58fbdeff9c"
-# ST=grid
-# SHIFT=32
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+# ######################################################################################### DE #######################################
 
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-07_21-16-31-edca2aa6-6617-4aa2-9de7-5fc0d610cc02"
-# ST=random
-# SHIFT=32
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-19_12-34-56-acfb33d8-497c-4396-98d7-7485fdc30a13"
+DC=512
+EN="./local_pipeline/ensembles/ensemble_512_DHN.txt"
+ARCH=DHN
+submit_job_ensemble $DC $EN $ARCH $MODEL 4
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-19_14-39-21-5d862420-4465-44c5-95c3-9ddd8e796d51"
+DC=256
+EN="./local_pipeline/ensembles/ensemble_256_DHN.txt"
+ARCH=DHN
+submit_job_ensemble $DC $EN $ARCH $MODEL 4
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-28_18-02-55-fd0e2a0f-93fe-43b2-b375-5a63b549d55e"
+DC=128
+EN="./local_pipeline/ensembles/ensemble_128_DHN.txt"
+ARCH=DHN
+submit_job_ensemble $DC $EN $ARCH $MODEL 4
 
-# #######################################64
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_larger_ori_train-2024-02-18_18-44-07-97a33213-80a2-4f50-9d85-9ad04d7df728/RHWF.pth"
+DC=512
+EN="./local_pipeline/ensembles/ensemble_512_IHN.txt"
+ARCH=IHN
+submit_job_ensemble $DC $EN $ARCH $MODEL 3
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_larger_ori_train-2024-02-18_18-44-07-cfb3bb2c-e987-4c17-bdc0-731bc776dcdd/RHWF.pth"
+DC=256
+EN="./local_pipeline/ensembles/ensemble_256_IHN.txt"
+ARCH=IHN
+submit_job_ensemble $DC $EN $ARCH $MODEL 3
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_larger_ori_train-2024-02-18_20-50-42-ed74e93e-0c1a-4926-9d12-21aa8c257e12/RHWF.pth"
+DC=128
+EN="./local_pipeline/ensembles/ensemble_128_IHN.txt"
+ARCH=IHN
+submit_job_ensemble $DC $EN $ARCH $MODEL 3
 
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-05_01-06-08-186a5cef-53b8-412a-9e9c-9321dbe27597"
-# ST=grid
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-04-27_00-45-46-07ebf9cb-0452-4163-a883-ef4a57b7a5a8/UAGL.pth"
+DC=512
+EN="./local_pipeline/ensembles/ensemble_512_STHN.txt"
+ARCH=IHN
+# submit_job_ensemble $DC $EN $ARCH $MODEL 2
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-30_14-15-37-b45bf3b1-0e14-490e-b525-d2e9837838f8/UAGL.pth"
+DC=256
+EN="./local_pipeline/ensembles/ensemble_256_STHN.txt"
+ARCH=IHN
+submit_job_ensemble $DC $EN $ARCH $MODEL 2
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-30_15-38-56-174bfc03-f499-45c1-86cf-b8ddeaaa6ec5/UAGL.pth"
+DC=128
+EN="./local_pipeline/ensembles/ensemble_128_STHN.txt"
+ARCH=IHN
+submit_job_ensemble $DC $EN $ARCH $MODEL 2
 
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-07_17-32-25-94fed2f0-d2f8-4d27-b643-1ce03ae6995b"
-# ST=random
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# submit_job_shift $ST $SHIFT $STDM $IT0 $IT1 $MODEL
+# ######################################################################################### CROPTTA DE val #######################################
 
-# ########################################################################################################################################aug
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_14-57-59-16ed57bd-e7c3-4575-8421-d180efbbff36"
+ST=random
+SHIFT=32
+ARCH=IHN
+EN="./local_pipeline/ensembles/ensemble_512_STHN.txt"
+COM=min
+submit_job_crop_ensemble $ST $SHIFT $ARCH $EN $COM $MODEL
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_14-57-59-16ed57bd-e7c3-4575-8421-d180efbbff36"
+ST=random
+SHIFT=32
+ARCH=IHN
+EN="./local_pipeline/ensembles/ensemble_512_STHN.txt"
+COM=add
+submit_job_crop_ensemble $ST $SHIFT $ARCH $EN $COM $MODEL
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_14-57-59-16ed57bd-e7c3-4575-8421-d180efbbff36"
+ST=random
+SHIFT=32
+ARCH=IHN
+EN="./local_pipeline/ensembles/ensemble_512_STHN.txt"
+COM=max
+submit_job_crop_ensemble $ST $SHIFT $ARCH $EN $COM $MODEL
 
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-07_17-31-08-f3d602e1-e43c-4180-b72d-df3e501df8f5"
-# ST=grid
-# SHIFT=32
-# STDM=all
-# IT0=6
-# IT1=6
-# DEG=1
-# submit_job_shift_aug $ST $SHIFT $STDM $IT0 $IT1 $DEG $MODEL
+# ######################################################################################### CROPTTA DE #######################################
 
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-07_17-31-19-b353128c-c99d-40e5-aa5f-47bdb5125b70"
-# ST=random
-# SHIFT=32
-# STDM=all
-# IT0=6
-# IT1=6
-# DEG=1
-# submit_job_shift_aug $ST $SHIFT $STDM $IT0 $IT1 $DEG $MODEL
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-04_16-28-22-97909f35-efa0-4568-9ce1-97dbd2a0ffbe/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=DHN
+EN="./local_pipeline/ensembles/ensemble_128_DHN.txt"
+COM=max
+DC=128
+submit_job_crop_ensemble $DC $ST $SHIFT $ARCH $EN $COM $MODEL 4
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-02_20-47-48-7e50d890-99e2-40e9-b429-22d591eb30ce/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=DHN
+EN="./local_pipeline/ensembles/ensemble_256_DHN.txt"
+COM=max
+DC=256
+submit_job_crop_ensemble $DC $ST $SHIFT $ARCH $EN $COM $MODEL 4
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-02_21-08-28-297e8fe7-8688-4d2c-bf75-ad6402aada9d/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=DHN
+EN="./local_pipeline/ensembles/ensemble_512_DHN.txt"
+COM=max
+DC=512
+submit_job_crop_ensemble $DC $ST $SHIFT $ARCH $EN $COM $MODEL 4
 
-# #######################################64
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_larger_ori_train-2024-02-18_20-50-42-ed74e93e-0c1a-4926-9d12-21aa8c257e12/RHWF.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+EN="./local_pipeline/ensembles/ensemble_128_IHN.txt"
+COM=max
+DC=128
+submit_job_crop_ensemble $DC $ST $SHIFT $ARCH $EN $COM $MODEL 3
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-04_12-39-21-59f0af94-1d92-4db6-b38c-739ffc7e522b/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+EN="./local_pipeline/ensembles/ensemble_256_IHN.txt"
+COM=max
+DC=256
+submit_job_crop_ensemble $DC $ST $SHIFT $ARCH $EN $COM $MODEL 3
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-04_02-58-47-d311243b-f6ed-4e5e-a317-a81308739cd0/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+EN="./local_pipeline/ensembles/ensemble_512_IHN.txt"
+COM=max
+DC=512
+submit_job_crop_ensemble $DC $ST $SHIFT $ARCH $EN $COM $MODEL 3
 
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-07_17-31-49-99b36f45-3aae-4801-9375-d48605f0142a"
-# ST=grid
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# DEG=1
-# submit_job_shift_aug $ST $SHIFT $STDM $IT0 $IT1 $DEG $MODEL
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-02_20-47-51-5147b2ac-e11b-42e3-b8e7-4050501b3877/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+EN="./local_pipeline/ensembles/ensemble_128_STHN.txt"
+COM=max
+DC=128
+submit_job_crop_ensemble $DC $ST $SHIFT $ARCH $EN $COM $MODEL 2
+# # w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-02_21-03-28-0969ae54-ba6a-4bcf-84da-1d46b7594784/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+EN="./local_pipeline/ensembles/ensemble_256_STHN.txt"
+COM=max
+DC=256
+submit_job_crop_ensemble $DC $ST $SHIFT $ARCH $EN $COM $MODEL 2
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_14-57-59-16ed57bd-e7c3-4575-8421-d180efbbff36/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+EN="./local_pipeline/ensembles/ensemble_512_STHN.txt"
+COM=max
+DC=512
+submit_job_crop_ensemble $DC $ST $SHIFT $ARCH $EN $COM $MODEL 2
 
-# MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-07_17-32-25-f6509aad-2905-4be4-8083-3d79a7fed615"
-# ST=random
-# SHIFT=64
-# STDM=all
-# IT0=6
-# IT1=6
-# DEG=1
-# submit_job_shift_aug $ST $SHIFT $STDM $IT0 $IT1 $DEG $MODEL
+# ######################################################################################### CROPTTA #######################################
+
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-04_16-28-22-97909f35-efa0-4568-9ce1-97dbd2a0ffbe/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=DHN
+DC=128
+submit_job_crop $DC $ST $SHIFT $ARCH $MODEL 4
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-02_20-47-48-7e50d890-99e2-40e9-b429-22d591eb30ce/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=DHN
+DC=256
+submit_job_crop $DC $ST $SHIFT $ARCH $MODEL 4
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-02_21-08-28-297e8fe7-8688-4d2c-bf75-ad6402aada9d/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=DHN
+DC=512
+submit_job_crop $DC $ST $SHIFT $ARCH $MODEL 4
+
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_larger_ori_train-2024-02-18_20-50-42-ed74e93e-0c1a-4926-9d12-21aa8c257e12/RHWF.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+DC=128
+submit_job_crop $DC $ST $SHIFT $ARCH $MODEL 3
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-04_15-04-28-5055f8ae-86a8-4b8c-84a7-6d7ccd74644a/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+DC=256
+submit_job_crop $DC $ST $SHIFT $ARCH $MODEL 3
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-04_02-58-47-d311243b-f6ed-4e5e-a317-a81308739cd0/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+DC=512
+submit_job_crop $DC $ST $SHIFT $ARCH $MODEL 3
+
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-02_20-47-51-5147b2ac-e11b-42e3-b8e7-4050501b3877/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+DC=128
+submit_job_crop $DC $ST $SHIFT $ARCH $MODEL 2
+# # w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-02_21-03-28-0969ae54-ba6a-4bcf-84da-1d46b7594784/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+DC=256
+submit_job_crop $DC $ST $SHIFT $ARCH $MODEL 2
+# w/ Crop Training - scratch - 5 - m
+MODEL="satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-06-01_14-57-59-16ed57bd-e7c3-4575-8421-d180efbbff36/UAGL.pth"
+ST=random
+SHIFT=32
+ARCH=IHN
+DC=512
+submit_job_crop $DC $ST $SHIFT $ARCH $MODEL 2
