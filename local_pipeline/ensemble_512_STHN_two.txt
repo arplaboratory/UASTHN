@@ -1,5 +1,0 @@
-logs/local_he/satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-04-27_00-45-46-07ebf9cb-0452-4163-a883-ef4a57b7a5a8/UAGL.pth
-logs/local_he/satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-06_19-58-59-65f57d99-a917-4590-99b1-3f9301c8d8e8/UAGL.pth
-logs/local_he/satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-06_20-02-59-a3acba4b-a8c5-42cc-afd2-be12e06e429c/UAGL.pth
-logs/local_he/satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-06_20-03-08-5481be09-c8d7-479b-80fb-660b2b11f43e/UAGL.pth
-logs/local_he/satellite_0_thermalmapping_135_nocontrast_dense_exclusion_largest_ori_train-2024-05-06_23-23-34-414eb52c-fc3e-4ab3-8f77-933e22cdd297/UAGL.pth
