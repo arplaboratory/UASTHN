@@ -464,7 +464,7 @@ class UAGL():
         return four_preds_list, four_pred
 
     def first_stage_ue_generate_bbox(self):
-        beta = 512 / self.args.resize_width
+        beta = self.args.crop_width / self.args.resize_width
         resized_ue_shift = self.args.ue_shift / beta
         x_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)
         y_start = torch.zeros((self.image_2.shape[0])).to(self.image_2.device)

@@ -54,16 +54,15 @@ class homo_dataset(data.Dataset):
                 self.augment_type.append("rotate")
             if self.args.resize_max > 0:
                 self.augment_type.append("resize")
-        base_transform = transforms.Compose(
+        self.base_transform = transforms.Compose(
             [
                 transforms.Resize([self.args.resize_width, self.args.resize_width]),
-                transforms.ToTensor(),
             ]
         )
         self.query_transform = transforms.Compose(
             [
                 transforms.Grayscale(num_output_channels=3),
-                base_transform
+                transforms.ToTensor()
             ]
         )
         
@@ -129,7 +128,7 @@ class homo_dataset(data.Dataset):
         t = t / alpha # align with the resized image
         
         t_tensor = torch.Tensor(t).squeeze(0)
-        y_grid, x_grid = np.mgrid[0:img1.shape[1], 0:img1.shape[2]]
+        y_grid, x_grid = np.mgrid[0:self.args.resize_width, 0:self.args.resize_width]
         point = np.vstack((x_grid.flatten(), y_grid.flatten())).transpose()
         four_point_org = torch.zeros((2, 2, 2))
         top_left = torch.Tensor([0, 0])
@@ -189,9 +188,10 @@ class homo_dataset(data.Dataset):
         
         if self.augment:
             #augment
+            #All point are in resized scales (256)
             four_point_org_augment = four_point_org.clone()
             four_point_1_augment = four_point_1.clone()
-            beta = 512/self.args.resize_width
+            beta = self.args.crop_width/self.args.resize_width
             if self.args.eval_model is None or self.args.multi_aug_eval: # EVAL
                 augment_type_single = random.choice(self.augment_type)
                 if augment_type_single == "rotate":
@@ -229,8 +229,25 @@ class homo_dataset(data.Dataset):
                     raise NotImplementedError()
             H = tgm.get_perspective_transform(four_point_org, four_point_org_augment)
             H_inverse = torch.inverse(H)
-            img1 = tgm.warp_perspective(img1.unsqueeze(0), H_inverse, (self.args.resize_width, self.args.resize_width)).squeeze(0)
+            img1_width = img1.shape[1]
+            four_point_raw = torch.zeros((2, 2, 2))
+            top_left_raw = torch.Tensor([0, 0])
+            top_right_raw = torch.Tensor([img1_width - 1, 0])
+            bottom_left_raw = torch.Tensor([0, img1_width - 1])
+            bottom_right_raw = torch.Tensor([img1_width - 1, img1_width - 1])
+            four_point_raw[:, 0, 0] = top_left_raw
+            four_point_raw[:, 0, 1] = top_right_raw
+            four_point_raw[:, 1, 0] = bottom_left_raw
+            four_point_raw[:, 1, 1] = bottom_right_raw
+            four_point_raw = four_point_raw.flatten(1).permute(1, 0).unsqueeze(0).contiguous() 
+            H_1 = tgm.get_perspective_transform(four_point_raw, four_point_org)
+            H_1_inverse = torch.inverse(H_1)
+            H_total = H_1_inverse @ H_inverse @ H_1
+            img1 = tgm.warp_perspective(img1.unsqueeze(0), H_total, (img1_width, img1_width)).squeeze(0)
             four_point_1 = four_point_1_augment
+
+        img1 = transforms.CenterCrop(self.args.crop_width)(img1)
+        img1 = self.base_transform(img1)
 
         H = tgm.get_perspective_transform(four_point_org, four_point_1)
         H = H.squeeze()
@@ -492,7 +509,7 @@ class MYTRIPLETDATA(MYDATA):
     def __init__(self, args, datasets_folder="datasets", dataset_name="pitts30k", split="train"):
         super().__init__(args, datasets_folder, dataset_name, split)
         self.mining = "random" # default to random
-        self.neg_dist_threshold = (args.database_size // 2 + 512 // 2) * math.sqrt(2) # Outside of image
+        self.neg_dist_threshold = (args.database_size // 2 + args.crop_width // 2) * math.sqrt(2) # Outside of image
 
         # Find soft_negatives_per_query, which are within train_positives_dist_threshold (10 meters)
         knn = NearestNeighbors(n_jobs=-1)
