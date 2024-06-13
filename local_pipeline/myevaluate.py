@@ -169,6 +169,8 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
                 ue_mask = ~ue_mask_rej
                 ue_mask_list.append(ue_mask)
             ue_mask = torch.stack(ue_mask_list, dim=1)
+        else:
+            model_eval = model
         total_ue_mask = torch.cat([total_ue_mask, ue_mask], dim=0)
         
         total_mace = torch.cat([total_mace,mace_vec], dim=0)
