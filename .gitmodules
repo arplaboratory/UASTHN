@@ -1,0 +1,6 @@
+[submodule "keypoint_pipeline/RoMaThermal"]
+	path = keypoint_pipeline/RoMaThermal
+	url = https://github.com/xjh19971/RoMaThermal
+[submodule "keypoint_pipeline/r2d2Thermal"]
+	path = keypoint_pipeline/r2d2Thermal
+	url = https://github.com/xjh19971/r2d2Thermal
