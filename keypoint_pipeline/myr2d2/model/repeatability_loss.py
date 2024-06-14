@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from nets.sampler import FullSampler
+from model.sampler import FullSampler
 
 class CosimLoss (nn.Module):
     """ Try to make the repeatability repeatable from one image to the other.

@@ -36,29 +36,23 @@ def main(args):
         extended_loader = None
 
     total_steps = 0
-    last_best_val_mace = None
+    last_best_val_loss = None
     while total_steps <= args.num_steps:
-        total_steps, last_best_val_mace = train(model, train_loader, args, total_steps, last_best_val_mace)
+        total_steps, last_best_val_loss = train(model, train_loader, args, total_steps, last_best_val_loss)
         if extended_loader is not None:
-            total_steps, last_best_val_mace = train(model, extended_loader, args, total_steps, last_best_val_mace, train_step_limit=len(train_loader))
+            total_steps, last_best_val_loss = train(model, extended_loader, args, total_steps, last_best_val_loss, train_step_limit=len(train_loader))
 
     test_dataset = datasets.fetch_dataloader(args, split='test')
     model_med = torch.load(args.save_dir + f'/{args.name}.pth')
     model.netG.load_state_dict(model_med['netG'], strict=True)
     evaluate_SNet(model, test_dataset, batch_size=args.batch_size, args=args, wandb_log=True)
 
-def train(model, train_loader, args, total_steps, last_best_val_mace, train_step_limit = None):
+def train(model, train_loader, args, total_steps, last_best_val_loss, train_step_limit = None):
     count = 0
-    if args.neg_training:
-        train_loader.dataset.recompute_negatives_random(args)
     for i_batch, data_blob in enumerate(tqdm(train_loader)):
         tic = time.time()
-        if args.neg_training:
-            image1, image2, flow, _, query_utm, database_utm, _, _, neg_image1  = [x for x in data_blob]
-            model.set_input(image1, image2, flow, neg_image1)
-        else:
-            image1, image2, flow, _, query_utm, database_utm, _, _  = [x for x in data_blob]
-            model.set_input(image1, image2, flow)
+        image1, image2, flow, _, query_utm, database_utm, _, _  = [x for x in data_blob]
+        model.set_input(image1, image2, flow)
         metrics = model.optimize_parameters()
         # if i_batch==0:
         #     save_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1.png')
@@ -85,16 +79,15 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
         toc = time.time()
         metrics['time'] = toc - tic
         wandb.log({
-                "mace": metrics["mace"],
                 "lr": metrics["lr"][0],
-                "R_loss": metrics["R_loss"],
-                "C_loss": metrics["C_loss"],
-                "P_loss": metrics["P_loss"],
+                "R_loss": metrics["loss_reliability"],
+                "C_loss": metrics["loss_cosim16"],
+                "P_loss": metrics["loss_peaky16"],
             },)
         total_steps += 1
         # Validate
         if total_steps % args.val_freq == args.val_freq - 1:
-            current_val_mace = validate(model, args, total_steps)
+            current_val_loss = validate(model, args, total_steps)
             # plot_train(logger, args)
             # plot_val(logger, args)
             PATH = args.save_dir + f'/{total_steps+1}_{args.name}.pth'
@@ -102,13 +95,13 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
                 "netG": model.netG.state_dict()
             }
             torch.save(checkpoint, PATH)
-            if last_best_val_mace is None or last_best_val_mace > current_val_mace:
-                logging.info(f"Saving best model, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
-                last_best_val_mace = current_val_mace
+            if last_best_val_loss is None or last_best_val_loss > current_val_loss:
+                logging.info(f"Saving best model, last_best_val_loss: {last_best_val_loss}, current_val_loss: {current_val_loss}")
+                last_best_val_loss = current_val_loss
                 PATH = args.save_dir + f'/{args.name}.pth'
                 torch.save(checkpoint, PATH)
             else:
-                logging.info(f"No Saving, last_best_val_mace: {last_best_val_mace}, current_val_mace: {current_val_mace}")
+                logging.info(f"No Saving, last_best_val_loss: {last_best_val_loss}, current_val_loss: {current_val_loss}")
 
         if total_steps >= args.num_steps:
             break
@@ -117,16 +110,16 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
             break
         else:
             count += 1
-    return total_steps, last_best_val_mace
+    return total_steps, last_best_val_loss
 
 def validate(model, args, total_steps):
     results = {}
     # Evaluate results
     results.update(validate_process(model, args, total_steps))
     wandb.log({
-                "val_mace": results['val_mace'],
+                "val_loss": results['val_loss'],
             })
-    return results['val_mace']
+    return results['val_loss']
 
 
 if __name__ == "__main__":

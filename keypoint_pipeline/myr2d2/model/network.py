@@ -5,6 +5,8 @@ import kornia.geometry.transform as tgm
 import kornia.geometry.bbox as bbox
 from model.patchnet import Quad_L2Net_ConfCFS
 from model.losses import MultiLoss
+from model.reliability_loss import ReliabilityLoss
+from model.repeatability_loss import CosimLoss, PeakyLoss
 from model.sampler import NghSampler2
 from utils import coords_grid, fetch_optimizer, warp
 import os
@@ -37,10 +39,10 @@ class KeyNet():
         self.netG = Quad_L2Net_ConfCFS()
         self.shift_flow_bbox = None
         self.sampler = NghSampler2(ngh=7, subq=-8, subd=1, pos_d=3, neg_d=5, border=16,
-                            subd_neg=-8,maxpool_pos=True)
-        self.critierion_AUX = MultiLoss(1, ReliabilityLoss(self.sampler, base=0.5, nq=20),
+                            subd_neg=-8,maxpool_pos=True).to(self.device)
+        self.criterionAUX = MultiLoss(1, ReliabilityLoss(self.sampler, base=0.5, nq=20),
                                         1, CosimLoss(N=self.args.N),
-                                        1, PeakyLoss(N=self.args.N))
+                                        1, PeakyLoss(N=self.args.N)).to(self.device)
         if for_training:
             self.optimizer_G, self.scheduler_G = fetch_optimizer(args, list(self.netG.parameters()))
             
@@ -55,6 +57,32 @@ class KeyNet():
         #     model = model.to(self.device)
         model = model.to(self.device)
         return model
+    
+    def get_flow_now(self, four_point):
+        four_point = four_point
+        four_point_org = torch.zeros((2, 2, 2)).to(four_point.device)
+        four_point_org[:, 0, 0] = torch.Tensor([0, 0])
+        four_point_org[:, 0, 1] = torch.Tensor([self.args.resize_width-1, 0])
+        four_point_org[:, 1, 0] = torch.Tensor([0, self.args.resize_width-1-1])
+        four_point_org[:, 1, 1] = torch.Tensor([self.args.resize_width-1-1, self.args.resize_width-1-1])
+
+        four_point_org = four_point_org.unsqueeze(0)
+        four_point_org = four_point_org.repeat(self.image_1.shape[0], 1, 1, 1)
+        four_point_new = four_point_org + four_point
+        four_point_org = four_point_org.flatten(2).permute(0, 2, 1).contiguous()
+        four_point_new = four_point_new.flatten(2).permute(0, 2, 1).contiguous()
+        H = tgm.get_perspective_transform(four_point_org, four_point_new)
+        gridy, gridx = torch.meshgrid(torch.linspace(0, self.args.resize_width-1, steps=self.args.resize_width), torch.linspace(0, self.args.resize_width-1, steps=self.args.resize_width))
+        points = torch.cat((gridx.flatten().unsqueeze(0), gridy.flatten().unsqueeze(0), torch.ones((1, self.args.resize_width * self.args.resize_width))),
+                           dim=0).unsqueeze(0).repeat(H.shape[0], 1, 1).to(four_point.device)
+        points_new = H.bmm(points)
+        if torch.isnan(points_new).any():
+            raise KeyError("Some of transformed coords are NaN!")
+        points_new = points_new / points_new[:, 2, :].unsqueeze(1)
+        points_new = points_new[:, 0:2, :]
+        flow = torch.cat((points_new[:, 0, :].reshape(four_point.shape[0], self.args.resize_width, self.args.resize_width).unsqueeze(1),
+                          points_new[:, 1, :].reshape(four_point.shape[0], self.args.resize_width, self.args.resize_width).unsqueeze(1)), dim=1)
+        return flow
     
     def set_input(self, A, B, flow_gt=None, neg_A=None):
         self.image_1_ori = A.to(self.device, non_blocking=True)
@@ -74,15 +102,18 @@ class KeyNet():
     def forward(self, for_training=False, for_test=False):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         # time1 = time.time()
-        self.output1 = self.netG(self.image_1)
-        self.output2 = self.netG(self.image_2)
+        output = self.netG(imgs=[self.image_1, self.image_2])
+        self.output = dict(**output)
+        # aflow is transformed coordinates but not flow itself
+        self.output['aflow'] = self.get_flow_now(self.flow_4cor).to(self.image_1.device)
+        self.output['mask'] = torch.ones_like(self.image_1).to(self.image_1.device)
         # time2 = time.time()
         # logging.debug("Time for 1st forward pass: " + str(time2 - time1) + " seconds")
         # self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
 
     def backward_G(self):
         """Calculate GAN and L1 loss for the generator"""
-        self.loss_G_Homo, self.metrics = self.criterionAUX(self.output1, self.output2) 
+        self.loss_G_Homo, self.metrics = self.criterionAUX(**self.output) 
         # combine loss and calculate gradients
         self.loss_G = self.loss_G_Homo
         self.metrics["G_loss"] = self.loss_G.cpu().item()
