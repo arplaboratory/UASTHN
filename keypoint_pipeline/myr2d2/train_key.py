@@ -44,9 +44,7 @@ def main(args):
 
     test_dataset = datasets.fetch_dataloader(args, split='test')
     model_med = torch.load(args.save_dir + f'/{args.name}.pth')
-    model.netG.load_state_dict(model_med['netG'], strict=False)
-    if args.two_stages:
-        model.netG_fine.load_state_dict(model_med['netG_fine'], strict=True)
+    model.netG.load_state_dict(model_med['netG'], strict=True)
     evaluate_SNet(model, test_dataset, batch_size=args.batch_size, args=args, wandb_log=True)
 
 def train(model, train_loader, args, total_steps, last_best_val_mace, train_step_limit = None):
@@ -64,27 +62,10 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
         metrics = model.optimize_parameters()
         # if i_batch==0:
         #     save_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1.png')
-        #     if args.first_stage_ue:
-        #         if args.ue_method == "augment":
-        #             save_img(torchvision.utils.make_grid(model.image_1_multi, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_multi.png')
-        #             save_img(torchvision.utils.make_grid(model.image_2_multi, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_multi.png')
-        #     if args.neg_training:
-        #         save_img(torchvision.utils.make_grid(model.image_1_neg, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_neg.png')
         #     save_img(torchvision.utils.make_grid(model.image_2, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2.png')
         #     save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
         #                      torchvision.utils.make_grid(model.real_warped_image_2, nrow=16, padding = 16, pad_value=0), 
         #                      args.save_dir + '/train_overlap_gt.png')
-        # if i_batch==0:
-        #     if not args.two_stages:
-        #         save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
-        #                         torchvision.utils.make_grid(model.fake_warped_image_2, nrow=16, padding = 16, pad_value=0),
-        #                         args.save_dir + f'/train_overlap_pred.png')
-        #     else:
-        #         save_img(torchvision.utils.make_grid(model.image_1_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img1_crop.png')
-        #         save_img(torchvision.utils.make_grid(model.image_2_crop, nrow=16, padding = 16, pad_value=0), args.save_dir + '/train_img2_crop.png')
-        #         save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
-        #                         torchvision.utils.make_grid(model.fake_warped_image_2, nrow=16, padding = 16, pad_value=0),
-        #                         args.save_dir + f'/train_overlap_pred.png')
         model.update_learning_rate()
         if torch.isnan(model.loss_G):
             weights = model.optimizer_G.param_groups[0]['params']
@@ -118,8 +99,7 @@ def train(model, train_loader, args, total_steps, last_best_val_mace, train_step
             # plot_val(logger, args)
             PATH = args.save_dir + f'/{total_steps+1}_{args.name}.pth'
             checkpoint = {
-                "netG": model.netG.state_dict(),
-                "netG_fine": model.netG_fine.state_dict() if args.two_stages else None,
+                "netG": model.netG.state_dict()
             }
             torch.save(checkpoint, PATH)
             if last_best_val_mace is None or last_best_val_mace > current_val_mace:

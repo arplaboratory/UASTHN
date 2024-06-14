@@ -70,11 +70,6 @@ class KeyNet():
         else:
             self.real_warped_image_2 = None
         self.image_1 = F.interpolate(self.image_1_ori, size=self.args.resize_width, mode='bilinear', align_corners=True, antialias=True)
-        if neg_A is not None:
-            self.image_1_neg_ori = neg_A.to(self.device, non_blocking=True)
-            self.image_1_neg = F.interpolate(self.image_1_neg_ori, size=self.args.resize_width, mode='bilinear', align_corners=True, antialias=True)
-        else:
-            self.image_1_neg = None
         
     def forward(self, for_training=False, for_test=False):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
@@ -87,7 +82,7 @@ class KeyNet():
 
     def backward_G(self):
         """Calculate GAN and L1 loss for the generator"""
-        self.loss_G_Homo, self.metrics = self.criterionAUX(self.four_preds_list, self.four_pred, self.flow_gt, self.args.gamma, self.args, self.metrics) 
+        self.loss_G_Homo, self.metrics = self.criterionAUX(self.output1, self.output2) 
         # combine loss and calculate gradients
         self.loss_G = self.loss_G_Homo
         self.metrics["G_loss"] = self.loss_G.cpu().item()
@@ -108,8 +103,6 @@ class KeyNet():
 
     def optimize_parameters(self):
         self.forward(for_training=True) # Calculate Fake A
-        if self.args.neg_training:
-            self.forward_neg(for_training=True)
         self.metrics = dict()
         # update G
         self.optimizer_G.zero_grad()        # set G's gradients to zero
