@@ -102,6 +102,11 @@ class KeyNet():
     def forward(self, for_training=False, for_test=False):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         # time1 = time.time()
+        if not hasattr(self, "imagenet_mean") or self.imagenet_mean is None:
+            self.imagenet_mean = torch.Tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(self.image_1.device)
+            self.imagenet_std = torch.Tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(self.image_1.device)
+        self.image_1 = (self.image_1.contiguous() - self.imagenet_mean) / self.imagenet_std
+        self.image_2 = (self.image_2.contiguous() - self.imagenet_mean) / self.imagenet_std
         output = self.netG(imgs=[self.image_1, self.image_2])
         self.output = dict(**output)
         # aflow is transformed coordinates but not flow itself
@@ -118,6 +123,10 @@ class KeyNet():
         self.loss_G = self.loss_G_Homo
         self.metrics["G_loss"] = self.loss_G.cpu().item()
         self.loss_G.backward()
+    
+    def calculate_G(self):
+        """Calculate GAN and L1 loss for the generator"""
+        self.loss_G_Homo, self.metrics = self.criterionAUX(**self.output) 
 
     def set_requires_grad(self, nets, requires_grad=False):
         """Set requies_grad=Fasle for all the networks to avoid unnecessary computations

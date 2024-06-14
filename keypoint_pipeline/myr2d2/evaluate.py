@@ -19,7 +19,7 @@ import logging
 def validate_process(model, args, total_steps):
     """ Perform evaluation on the FlyingChairs (test) split """
     model.netG.eval()
-    mace_list = []
+    loss_list = []
     val_loader = datasets.fetch_dataloader(args, split='val')
     for i_batch, data_blob in enumerate(tqdm(val_loader)):
             
@@ -35,15 +35,16 @@ def validate_process(model, args, total_steps):
         flow_4cor[:, :, 0, 1] = flow_gt[:, :, 0, -1]
         flow_4cor[:, :, 1, 0] = flow_gt[:, :, -1, 0]
         flow_4cor[:, :, 1, 1] = flow_gt[:, :, -1, -1]
-        if hasattr(model.netG, "module"):
-            device = model.netG.module.device
-        else:
-            device = model.netG.device
+        device = args.device
         image1 = image1.to(device)
         image2 = image2.to(device)
         model.set_input(image1, image2, flow_gt)
         with torch.no_grad():
             model.forward()
+            model.calculate_G()
+            metrics = model.metrics
+            loss_list.append(metrics['loss'])
+            
         # if i_batch == 0:
         #     # Visualize
         #     save_overlap_img(torchvision.utils.make_grid(model.image_1, nrow=16, padding = 16, pad_value=0),
@@ -56,15 +57,8 @@ def validate_process(model, args, total_steps):
         #         save_overlap_img(torchvision.utils.make_grid(model.image_1_crop, nrow=16, padding = 16, pad_value=0),
         #                     torchvision.utils.make_grid(model.image_2, nrow=16, padding = 16, pad_value=0), 
         #                     args.save_dir + '/val_overlap_crop.png')
-        four_pr = model.four_pred
-        mace = torch.sum((four_pr.cpu().detach() - flow_4cor) ** 2, dim=1).sqrt()
-        mace_list.append(mace.view(-1).numpy())
-    if args.first_stage_ue and args.ue_method == "ensemble":
-        for i in range(len(model.netG_list)):
-            model.netG_list[i].train()
     model.netG.train()
-    if args.two_stages:
-        model.netG_fine.train()
-    mace = np.mean(np.concatenate(mace_list))
-    logging.info("Validation MACE: %f" % mace)
-    return {'val_mace': mace}
+    print(loss_list)
+    loss = np.mean(np.stack(loss_list))
+    logging.info("Validation LOSS: %f" % loss)
+    return {'val_loss': loss}

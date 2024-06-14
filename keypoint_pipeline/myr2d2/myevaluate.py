@@ -21,6 +21,7 @@ from os.path import join
 import commons
 import logging
 import wandb
+from extract import NonMaxSuppression, extract_multiscale
 
 def load_model(args, model):
     model.netG.load_state_dict(model_med['netG'], strict=True)
@@ -46,13 +47,13 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     total_ce = torch.empty(0)
     total_ue_mask = torch.empty(0, len(args.ue_rej_std))
     timeall=[]
-    if args.generate_test_pairs:
-        test_pairs = torch.zeros(len(val_dataset.dataset), dtype=torch.long)
 
+    detector = NonMaxSuppression(
+        rel_thr = args.reliability_thr, 
+        rep_thr = args.repeatability_thr)
+        
     for i_batch, data_blob in enumerate(tqdm(val_dataset)):
         img1, img2, flow_gt,  H, query_utm, database_utm, index, pos_index  = [x for x in data_blob]
-        if args.generate_test_pairs:
-            test_pairs[index] = pos_index
 
         if i_batch == 0:
             logging.info("Check the reproducibility by UTM:")
@@ -60,11 +61,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
             logging.info(f"the first 5th database UTMs: {database_utm[:5]}")
 
         if not args.identity:
-            if not args.ue_method == "augment_ensemble":
-                model.set_input(img1, img2, flow_gt)
-            else:
-                for model_single in model:
-                    model_single.set_input(img1, img2, flow_gt)
+            model.set_input(img1, img2, flow_gt)
         flow_4cor = torch.zeros((flow_gt.shape[0], 2, 2, 2))
         flow_4cor[:, :, 0, 0] = flow_gt[:, :, 0, 0]
         flow_4cor[:, :, 0, 1] = flow_gt[:, :, 0, -1]
@@ -73,12 +70,40 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
 
         if not args.identity:
             with torch.no_grad():
-                time_start = time.time()
-                model.forward(for_test=True)
-                time_end = time.time()
-                timeall.append(time_end-time_start)
-                print(time_end-time_start)
-                four_pred = model.four_pred
+                if not hasattr(model, "imagenet_mean") or model.imagenet_mean is None:
+                    model.imagenet_mean = torch.Tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(model.image_1.device)
+                    model.imagenet_std = torch.Tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(model.image_1.device)
+                model.image_1 = (model.image_1.contiguous() - model.imagenet_mean) / model.imagenet_std
+                model.image_2 = (model.image_2.contiguous() - model.imagenet_mean) / model.imagenet_std
+                with torch.no_grad():
+                    xys1, desc1, scores1 = extract_multiscale(model.netG, model.image_1, detector,
+                        scale_f   = 2**0.25, 
+                        min_scale = 1.0, 
+                        max_scale = 1.0,
+                        min_size  = 256, 
+                        max_size  = 256, 
+                        verbose = True)
+                    xys1 = xys1.cpu().numpy()
+                    desc1 = desc1.cpu().numpy()
+                    scores1 = scores1.cpu().numpy()
+                    idxs1 = scores1.argsort()[-5000 or None:]
+                    xys1 = xys1[idxs1]
+                    desc1 = desc1[idxs1]
+                    scores1 = scores1[idxs1]
+                    xys2, desc2, scores2 = extract_multiscale(model.netG, model.image_2, detector,
+                        scale_f   = 2**0.25, 
+                        min_scale = 1.0, 
+                        max_scale = 1.0,
+                        min_size  = 256, 
+                        max_size  = 256, 
+                        verbose = True)
+                    xys2 = xys2.cpu().numpy()
+                    desc2 = desc2.cpu().numpy()
+                    scores2 = scores2.cpu().numpy()
+                    idxs2 = scores2.argsort()[-5000 or None:]
+                    xys2 = xys2[idxs2]
+                    desc2 = desc2[idxs2]
+                    scores2 = scores2[idxs2]
         else:
             four_pred = torch.zeros((flow_gt.shape[0], 2, 2, 2))
 

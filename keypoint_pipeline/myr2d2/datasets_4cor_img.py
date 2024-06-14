@@ -447,7 +447,7 @@ class MYDATA(homo_dataset):
             img = self._find_img_in_h5(index, database_queries_split="queries")
         
         # Positives
-        if self.test_pairs is not None and not self.args.generate_test_pairs:
+        if self.test_pairs is not None:
             pos_index = self.test_pairs[index]
         else:
             pos_index = random.choice(self.get_positive_indexes(index))
