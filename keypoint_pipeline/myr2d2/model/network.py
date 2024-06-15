@@ -112,7 +112,7 @@ class KeyNet():
             self.imagenet_std = torch.Tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(self.image_1.device)
         self.image_1 = (self.image_1.contiguous() - self.imagenet_mean) / self.imagenet_std
         self.image_2 = (self.image_2.contiguous() - self.imagenet_mean) / self.imagenet_std
-        output = self.netG(imgs=[self.image_1, self.image_2])
+        output = self.netG(imgs=[self.image_2, self.image_1])
         self.output = dict(**output)
         # aflow is transformed coordinates but not flow itself
         self.output['aflow'] = self.get_flow_now(self.flow_4cor).to(self.image_1.device)
