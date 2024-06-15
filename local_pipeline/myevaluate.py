@@ -208,7 +208,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         #     if not os.path.exists(save_dir):
         #         os.mkdir(save_dir)
         #     if not args.two_stages:
-        #         save_overlap_bbox_img(model_eval.image_1, model_eval.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, ue_mask=ue_mask)
+        #         save_overlap_bbox_img(model_eval.image_1, model_eval.real_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, ue_mask=ue_mask)
         #     else:
         #         four_point_org_single_ori = torch.zeros((1, 2, 2, 2))
         #         four_point_org_single_ori[:, :, 0, 0] = torch.Tensor([0, 0])
@@ -218,7 +218,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         #         four_point_bbox = model_eval.flow_bbox.cpu().detach() + four_point_org_single_ori
         #         alpha = args.database_size / args.resize_width
         #         four_point_bbox = four_point_bbox.flatten(2).permute(0, 2, 1).contiguous() / alpha
-        #         save_overlap_bbox_img(model_eval.image_1, model_eval.fake_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox, ue_mask=ue_mask)
+        #         save_overlap_bbox_img(model_eval.image_1, model_eval.real_warped_image_2, save_dir + f'/train_overlap_bbox_{i_batch}.png', four_point_gt, four_point_1, crop_bbox=four_point_bbox, ue_mask=ue_mask)
         #         if args.ue_method == "augment":
         #             four_point_gt_multi = four_point_gt.repeat(args.ue_num_crops, 1, 1)
         #             four_point_1_multi = four_point_1.repeat(args.ue_num_crops, 1, 1)

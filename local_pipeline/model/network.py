@@ -16,6 +16,7 @@ import random
 import time
 import logging
 from model.baseline import DHN, LocalTrans
+import datasets_4cor_img as datasets
 import numpy as np
 
 autocast = torch.cuda.amp.autocast
@@ -270,7 +271,8 @@ class UAGL():
         self.image_2 = B.to(self.device, non_blocking=True)
         self.flow_gt = flow_gt.to(self.device, non_blocking=True)
         if self.flow_gt is not None:
-            # self.real_warped_image_2 = mywarp(self.image_2, self.flow_gt, self.four_point_org_single) # Comment for performance evaluation 
+            if self.args.vis_all:
+                self.real_warped_image_2 = mywarp(datasets.base_transforms(self.image_2), self.flow_gt, self.four_point_org_single) # Comment for performance evaluation 
             self.flow_4cor = torch.zeros((self.flow_gt.shape[0], 2, 2, 2)).to(self.flow_gt.device)
             self.flow_4cor[:, :, 0, 0] = self.flow_gt[:, :, 0, 0]
             self.flow_4cor[:, :, 0, 1] = self.flow_gt[:, :, 0, -1]
@@ -279,6 +281,8 @@ class UAGL():
         else:
             self.real_warped_image_2 = None
         self.image_1 = F.interpolate(self.image_1_ori, size=self.args.resize_width, mode='bilinear', align_corners=True, antialias=True)
+        if self.args.vis_all:
+            self.image_1_show = datasets.base_transforms(self.image_1) # Comment for performance evaluation 
         if neg_A is not None:
             self.image_1_neg_ori = neg_A.to(self.device, non_blocking=True)
             self.image_1_neg = F.interpolate(self.image_1_neg_ori, size=self.args.resize_width, mode='bilinear', align_corners=True, antialias=True)
@@ -349,7 +353,8 @@ class UAGL():
             self.four_preds_list, self.four_pred = self.combine_coarse_fine(self.four_preds_list, self.four_pred, self.four_preds_list_fine, self.four_pred_fine, delta, self.flow_bbox, for_training)
             # print(self.four_pred[0])
             # raise KeyError()
-        # self.fake_warped_image_2 = mywarp(self.image_2, self.four_pred, self.four_point_org_single) # Comment for performance evaluation
+        if self.args.vis_all:
+            self.fake_warped_image_2 = mywarp(datasets.base_transforms(self.image_2), self.four_pred, self.four_point_org_single) # Comment for performance evaluation
 
     def forward_neg(self, for_training=False):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""

@@ -29,9 +29,17 @@ TB_val_region = [2650, 5650, 5100, 9500]
 
 inv_base_transforms = transforms.Compose(
     [ 
-        # transforms.Normalize(mean = [ -m/s for m, s in zip(imagenet_mean, imagenet_std)],
-        #                      std = [ 1/s for s in imagenet_std]),
+        transforms.Normalize(mean = [ -m/s for m, s in zip(imagenet_mean, imagenet_std)],
+                             std = [ 1/s for s in imagenet_std]),
         transforms.ToPILImage(),
+    ]
+)
+
+base_transforms = transforms.Compose(
+    [ 
+        # transforms.ToTensor(),
+        transforms.Normalize(mean = imagenet_mean,
+                             std = imagenet_std),
     ]
 )
 
