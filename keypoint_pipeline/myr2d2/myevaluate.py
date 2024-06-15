@@ -91,7 +91,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
                     max_scale = 1.0,
                     min_size  = 256, 
                     max_size  = 256, 
-                    verbose = True)
+                    verbose = False)
                 xys1 = xys1.cpu().numpy()
                 desc1 = desc1.cpu().numpy()
                 scores1 = scores1.cpu().numpy()
@@ -105,7 +105,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
                     max_scale = 1.0,
                     min_size  = 256, 
                     max_size  = 256, 
-                    verbose = True)
+                    verbose = False)
                 xys2 = xys2.cpu().numpy()
                 desc2 = desc2.cpu().numpy()
                 scores2 = scores2.cpu().numpy()
@@ -131,46 +131,63 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
             if len(matches) > 10:
                 src_pts = np.float32([xy2_kp[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
                 dst_pts = np.float32([xy1_kp[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-                H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-                # H, mask = cv2.findHomography(src_pts, dst_pts, cv2.USAC_MAGSAC, 5.0)
-                four_point_pred_augment = H @ four_point_augment.cpu().numpy()
+                try:
+                    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+                    # H, mask = cv2.findHomography(src_pts, dst_pts, cv2.USAC_MAGSAC, 5.0)
+                    four_point_pred_augment = H @ four_point_augment.cpu().numpy()
+                except Exception as e:
+                    print("Skip: Cannot find H")
+                    ue_mask = torch.zeros((1, 1), dtype=torch.bool)
+                    total_ue_mask = torch.cat([total_ue_mask, ue_mask], dim=0)
+                    continue
                 four_point_pred = four_point_pred_augment[:2, :] / four_point_pred_augment[2, :]
                 four_pred = torch.tensor(four_point_pred) - four_point_org_single[0].view(2, -1)
                 four_pred = (four_pred.view(1, 2, 2, 2)).float()
+                ue_mask = torch.ones((1, 1), dtype=torch.bool)
+            else:
+                ue_mask = torch.zeros((1, 1), dtype=torch.bool)
+                total_ue_mask = torch.cat([total_ue_mask, ue_mask], dim=0)
+                continue
 
-        mace_ = (flow_4cor - four_pred.cpu().detach())**2
-        mace_ = ((mace_[:,0,:,:] + mace_[:,1,:,:])**0.5)
-        mace_vec = torch.mean(torch.mean(mace_, dim=1), dim=1)
-        # print(mace_[0,:])
-        ue_mask = torch.ones((mace_vec.shape[0], len(args.ue_rej_std)))
-        model_eval = model
+        try:
+            mace_ = (flow_4cor - four_pred.cpu().detach())**2
+            mace_ = ((mace_[:,0,:,:] + mace_[:,1,:,:])**0.5)
+            mace_vec = torch.mean(torch.mean(mace_, dim=1), dim=1)
+            # print(mace_[0,:])
+            ue_mask = torch.ones((mace_vec.shape[0], len(args.ue_rej_std)))
+            model_eval = model
+            
+            # CE
+            four_point_1 = four_pred.cpu().detach() + four_point_org_single
+            four_point_org = four_point_org_single.repeat(four_point_1.shape[0],1,1,1).flatten(2).permute(0, 2, 1).contiguous() 
+            four_point_1 = four_point_1.flatten(2).permute(0, 2, 1).contiguous()
+            four_point_gt = flow_4cor.cpu().detach() + four_point_org_single
+            four_point_gt = four_point_gt.flatten(2).permute(0, 2, 1).contiguous()
+            H = tgm.get_perspective_transform(four_point_org, four_point_1)
+            center_T = torch.tensor([args.resize_width/2-0.5, args.resize_width/2-0.5, 1]).unsqueeze(1).unsqueeze(0).repeat(H.shape[0], 1, 1)
+            w = torch.bmm(H, center_T).squeeze(2)
+            center_pred_offset = w[:, :2]/w[:, 2].unsqueeze(1) - center_T[:, :2].squeeze(2)
+            # alpha = args.database_size / args.resize_width
+            # center_gt_offset = (query_utm - database_utm).squeeze(1) / alpha
+            # temp = center_gt_offset[:, 0].clone()
+            # center_gt_offset[:, 0] = center_gt_offset[:, 1]
+            # center_gt_offset[:, 1] = temp # Swap!
+            H_gt = tgm.get_perspective_transform(four_point_org, four_point_gt)
+            w_gt = torch.bmm(H_gt, center_T).squeeze(2)
+            center_gt_offset = w_gt[:, :2]/w_gt[:, 2].unsqueeze(1) - center_T[:, :2].squeeze(2)
+            ce_ = (center_pred_offset - center_gt_offset)**2
+            ce_ = ((ce_[:,0] + ce_[:,1])**0.5)
+            ce_vec = ce_
+        except Exception as e:
+            print(f"Skip: {e}")
+            continue
+
         total_ue_mask = torch.cat([total_ue_mask, ue_mask], dim=0)
-        
         total_mace = torch.cat([total_mace,mace_vec], dim=0)
-        
-        # CE
-        four_point_1 = four_pred.cpu().detach() + four_point_org_single
-        four_point_org = four_point_org_single.repeat(four_point_1.shape[0],1,1,1).flatten(2).permute(0, 2, 1).contiguous() 
-        four_point_1 = four_point_1.flatten(2).permute(0, 2, 1).contiguous()
-        four_point_gt = flow_4cor.cpu().detach() + four_point_org_single
-        four_point_gt = four_point_gt.flatten(2).permute(0, 2, 1).contiguous()
-        H = tgm.get_perspective_transform(four_point_org, four_point_1)
-        center_T = torch.tensor([args.resize_width/2-0.5, args.resize_width/2-0.5, 1]).unsqueeze(1).unsqueeze(0).repeat(H.shape[0], 1, 1)
-        w = torch.bmm(H, center_T).squeeze(2)
-        center_pred_offset = w[:, :2]/w[:, 2].unsqueeze(1) - center_T[:, :2].squeeze(2)
-        # alpha = args.database_size / args.resize_width
-        # center_gt_offset = (query_utm - database_utm).squeeze(1) / alpha
-        # temp = center_gt_offset[:, 0].clone()
-        # center_gt_offset[:, 0] = center_gt_offset[:, 1]
-        # center_gt_offset[:, 1] = temp # Swap!
-        H_gt = tgm.get_perspective_transform(four_point_org, four_point_gt)
-        w_gt = torch.bmm(H_gt, center_T).squeeze(2)
-        center_gt_offset = w_gt[:, :2]/w_gt[:, 2].unsqueeze(1) - center_T[:, :2].squeeze(2)
-        ce_ = (center_pred_offset - center_gt_offset)**2
-        ce_ = ((ce_[:,0] + ce_[:,1])**0.5)
-        ce_vec = ce_
         total_ce = torch.cat([total_ce, ce_vec], dim=0)
         
+        print(mace_vec)
+        print(ce_vec)
         # if args.vis_all:
         #     save_dir = os.path.join(args.save_dir, 'vis')
         #     if not os.path.exists(save_dir):
@@ -195,8 +212,11 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     for j in range(total_ue_mask.shape[1]):
         ue_mask_single = total_ue_mask[:,j]
         final_ue_mask = torch.count_nonzero(ue_mask_single)/len(ue_mask_single)
-        final_mace = torch.mean(total_mace * ue_mask_single).item()
-        final_ce = torch.mean(total_ce * ue_mask_single).item()
+        print(ue_mask_single.shape)
+        print(total_mace.shape)
+        print(total_ce.shape)
+        final_mace = torch.mean(total_mace).item()
+        final_ce = torch.mean(total_ce).item()
         logging.info(f"MACE Metric {j}: {final_mace}")
         logging.info(f'CE Metric {j}: {final_ce}')
         logging.info(f'Success rate {j}:{final_ue_mask}')
@@ -211,8 +231,6 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     io.savemat(args.save_dir + '/resmat', {'matrix': total_mace.numpy()})
     np.save(args.save_dir + '/resnpy.npy', total_mace.numpy())
     plot_hist_helper(args.save_dir)
-    if args.generate_test_pairs:
-        torch.save(test_pairs, f"cache/{val_dataset.dataset.split}_{args.val_positive_dist_threshold}_pairs.pth")
 
 if __name__ == '__main__':
     args = parser.parse_arguments()
