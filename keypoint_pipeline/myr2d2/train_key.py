@@ -80,7 +80,7 @@ def train(model, train_loader, args, total_steps, last_best_val_loss, train_step
         metrics['time'] = toc - tic
         wandb.log({
                 "lr": metrics["lr"][0],
-                "R_loss": metrics["loss_reliability"],
+                "R_loss": metrics["loss_reliability"] if not args.disable_reliability else metrics["loss_pixAP"],
                 "C_loss": metrics["loss_cosim16"],
                 "P_loss": metrics["loss_peaky16"],
             },)
