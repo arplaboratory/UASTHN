@@ -22,8 +22,10 @@ import commons
 import logging
 import wandb
 from extract import NonMaxSuppression, extract_multiscale
+from datasets_4cor_img import inv_base_transforms
 
 def load_model(args, model):
+    model_med = torch.load(args.eval_model, map_location='cuda:0')
     model.netG.load_state_dict(model_med['netG'], strict=True)
     model.setup() 
     model.netG.eval()
@@ -45,6 +47,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     total_mace = torch.empty(0)
     total_flow = torch.empty(0)
     total_ce = torch.empty(0)
+    args.ue_rej_std = [1]
     total_ue_mask = torch.empty(0, len(args.ue_rej_std))
     timeall=[]
 
@@ -60,52 +63,80 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
             logging.info(f"the first 5th query UTMs: {query_utm[:5]}")
             logging.info(f"the first 5th database UTMs: {database_utm[:5]}")
 
-        if not args.identity:
-            model.set_input(img1, img2, flow_gt)
+        model.set_input(img1, img2, flow_gt)
         flow_4cor = torch.zeros((flow_gt.shape[0], 2, 2, 2))
         flow_4cor[:, :, 0, 0] = flow_gt[:, :, 0, 0]
         flow_4cor[:, :, 0, 1] = flow_gt[:, :, 0, -1]
         flow_4cor[:, :, 1, 0] = flow_gt[:, :, -1, 0]
         flow_4cor[:, :, 1, 1] = flow_gt[:, :, -1, -1]
-
-        if not args.identity:
+        four_point_org_single = torch.zeros((1, 2, 2, 2))
+        four_point_org_single[:, :, 0, 0] = torch.Tensor([0, 0])
+        four_point_org_single[:, :, 0, 1] = torch.Tensor([args.resize_width - 1, 0])
+        four_point_org_single[:, :, 1, 0] = torch.Tensor([0, args.resize_width - 1])
+        four_point_org_single[:, :, 1, 1] = torch.Tensor([args.resize_width - 1, args.resize_width - 1])
+        four_point_augment = four_point_org_single[0].view(2, -1)
+        four_point_augment = torch.cat([four_point_augment, torch.ones((1, four_point_augment.shape[1])).to(four_point_augment.device)], dim=0)
+        image_1_raw = np.array(inv_base_transforms(model.image_1[0].clone().cpu()))
+        image_2_raw = np.array(inv_base_transforms(model.image_2[0].clone().cpu()))
+        with torch.no_grad():
+            if not hasattr(model, "imagenet_mean") or model.imagenet_mean is None:
+                model.imagenet_mean = torch.Tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(model.image_1.device)
+                model.imagenet_std = torch.Tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(model.image_1.device)
+            model.image_1 = (model.image_1.contiguous() - model.imagenet_mean) / model.imagenet_std
+            model.image_2 = (model.image_2.contiguous() - model.imagenet_mean) / model.imagenet_std
             with torch.no_grad():
-                if not hasattr(model, "imagenet_mean") or model.imagenet_mean is None:
-                    model.imagenet_mean = torch.Tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(model.image_1.device)
-                    model.imagenet_std = torch.Tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(2).unsqueeze(3).to(model.image_1.device)
-                model.image_1 = (model.image_1.contiguous() - model.imagenet_mean) / model.imagenet_std
-                model.image_2 = (model.image_2.contiguous() - model.imagenet_mean) / model.imagenet_std
-                with torch.no_grad():
-                    xys1, desc1, scores1 = extract_multiscale(model.netG, model.image_1, detector,
-                        scale_f   = 2**0.25, 
-                        min_scale = 1.0, 
-                        max_scale = 1.0,
-                        min_size  = 256, 
-                        max_size  = 256, 
-                        verbose = True)
-                    xys1 = xys1.cpu().numpy()
-                    desc1 = desc1.cpu().numpy()
-                    scores1 = scores1.cpu().numpy()
-                    idxs1 = scores1.argsort()[-5000 or None:]
-                    xys1 = xys1[idxs1]
-                    desc1 = desc1[idxs1]
-                    scores1 = scores1[idxs1]
-                    xys2, desc2, scores2 = extract_multiscale(model.netG, model.image_2, detector,
-                        scale_f   = 2**0.25, 
-                        min_scale = 1.0, 
-                        max_scale = 1.0,
-                        min_size  = 256, 
-                        max_size  = 256, 
-                        verbose = True)
-                    xys2 = xys2.cpu().numpy()
-                    desc2 = desc2.cpu().numpy()
-                    scores2 = scores2.cpu().numpy()
-                    idxs2 = scores2.argsort()[-5000 or None:]
-                    xys2 = xys2[idxs2]
-                    desc2 = desc2[idxs2]
-                    scores2 = scores2[idxs2]
-        else:
-            four_pred = torch.zeros((flow_gt.shape[0], 2, 2, 2))
+                xys1, desc1, scores1, rep1, rel1 = extract_multiscale(model.netG, model.image_1, detector,
+                    scale_f   = 2**0.25, 
+                    min_scale = 1.0, 
+                    max_scale = 1.0,
+                    min_size  = 256, 
+                    max_size  = 256, 
+                    verbose = True)
+                xys1 = xys1.cpu().numpy()
+                desc1 = desc1.cpu().numpy()
+                scores1 = scores1.cpu().numpy()
+                idxs1 = scores1.argsort()[-5000 or None:]
+                xys1 = xys1[idxs1]
+                desc1 = desc1[idxs1]
+                scores1 = scores1[idxs1]
+                xys2, desc2, scores2, rep2, rel2 = extract_multiscale(model.netG, model.image_2, detector,
+                    scale_f   = 2**0.25, 
+                    min_scale = 1.0, 
+                    max_scale = 1.0,
+                    min_size  = 256, 
+                    max_size  = 256, 
+                    verbose = True)
+                xys2 = xys2.cpu().numpy()
+                desc2 = desc2.cpu().numpy()
+                scores2 = scores2.cpu().numpy()
+                idxs2 = scores2.argsort()[-5000 or None:]
+                xys2 = xys2[idxs2]
+                desc2 = desc2[idxs2]
+                scores2 = scores2[idxs2]
+            bf = cv2.BFMatcher(crossCheck=True)
+            matches = bf.match(desc2, desc1)
+            xy1 = xys1[:, :2]
+            xy2 = xys2[:, :2]
+            xy1_kp = [cv2.KeyPoint() for i in range(len(xy1))]
+            for i in range(len(xy1)):
+                xy1_kp[i].pt = (xy1[i,0], xy1[i,1])
+            xy2_kp = [cv2.KeyPoint() for i in range(len(xy2))]
+            for i in range(len(xy2)):
+                xy2_kp[i].pt = (xy2[i,0], xy2[i,1])
+            # img3 = cv2.drawMatches(image_2_raw,xy2_kp,image_1_raw,xy1_kp,matches[:100],None,flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+            # plt.figure()
+            # plt.imshow(img3)
+            # plt.savefig(f"match_{i_batch}.png", bbox_inches='tight')
+            # plt.close()
+            if len(matches) > 10:
+                src_pts = np.float32([xy2_kp[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+                dst_pts = np.float32([xy1_kp[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+                H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+                # H, mask = cv2.findHomography(src_pts, dst_pts, cv2.USAC_MAGSAC, 5.0)
+                four_point_pred_augment = H @ four_point_augment.cpu().numpy()
+                four_point_pred = four_point_pred_augment[:2, :] / four_point_pred_augment[2, :]
+                four_pred = torch.tensor(four_point_pred) - four_point_org_single[0].view(2, -1)
+                four_pred = (four_pred.view(1, 2, 2, 2)).float()
 
         mace_ = (flow_4cor - four_pred.cpu().detach())**2
         mace_ = ((mace_[:,0,:,:] + mace_[:,1,:,:])**0.5)
@@ -118,11 +149,6 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         total_mace = torch.cat([total_mace,mace_vec], dim=0)
         
         # CE
-        four_point_org_single = torch.zeros((1, 2, 2, 2))
-        four_point_org_single[:, :, 0, 0] = torch.Tensor([0, 0])
-        four_point_org_single[:, :, 0, 1] = torch.Tensor([args.resize_width - 1, 0])
-        four_point_org_single[:, :, 1, 0] = torch.Tensor([0, args.resize_width - 1])
-        four_point_org_single[:, :, 1, 1] = torch.Tensor([args.resize_width - 1, args.resize_width - 1])
         four_point_1 = four_pred.cpu().detach() + four_point_org_single
         four_point_org = four_point_org_single.repeat(four_point_1.shape[0],1,1,1).flatten(2).permute(0, 2, 1).contiguous() 
         four_point_1 = four_point_1.flatten(2).permute(0, 2, 1).contiguous()
@@ -191,22 +217,13 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
 if __name__ == '__main__':
     args = parser.parse_arguments()
     start_time = datetime.now()
-    if args.identity:
-        args.save_dir = join(
-        "test",
-        args.save_dir,
-        "identity",
-        f"{args.dataset_name}-{start_time.strftime('%Y-%m-%d_%H-%M-%S')}",
-        )
-        commons.setup_logging(args.save_dir, console='info')
-    else:
-        args.save_dir = join(
-        "test",
-        args.save_dir,
-        args.eval_model.split("/")[-2],
-        f"{args.dataset_name}-{start_time.strftime('%Y-%m-%d_%H-%M-%S')}",
-        )
-        commons.setup_logging(args.save_dir, console='info')
+    args.save_dir = join(
+    "test",
+    args.save_dir,
+    args.eval_model.split("/")[-2],
+    f"{args.dataset_name}-{start_time.strftime('%Y-%m-%d_%H-%M-%S')}",
+    )
+    commons.setup_logging(args.save_dir, console='info')
     setup_seed(0)
     logging.debug(args)
     wandb_log = True

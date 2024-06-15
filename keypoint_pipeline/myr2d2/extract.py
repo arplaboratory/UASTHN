@@ -105,7 +105,7 @@ def extract_multiscale( net, img, detector, scale_f=2**0.25,
     scores = torch.cat(C) * torch.cat(Q) # scores = reliability * repeatability
     XYS = torch.stack([X,Y,S], dim=-1)
     D = torch.cat(D)
-    return XYS, D, scores
+    return XYS, D, scores, reliability, repeatability
 
 
 def extract_keypoints(args):
