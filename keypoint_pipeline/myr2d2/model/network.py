@@ -5,7 +5,7 @@ import kornia.geometry.transform as tgm
 import kornia.geometry.bbox as bbox
 from model.patchnet import Quad_L2Net_ConfCFS
 from model.losses import MultiLoss
-from model.reliability_loss import ReliabilityLoss
+from model.reliability_loss import ReliabilityLoss, PixelAPLoss
 from model.repeatability_loss import CosimLoss, PeakyLoss
 from model.sampler import NghSampler2
 from utils import coords_grid, fetch_optimizer, warp
@@ -40,7 +40,12 @@ class KeyNet():
         self.shift_flow_bbox = None
         self.sampler = NghSampler2(ngh=7, subq=-8, subd=1, pos_d=3, neg_d=5, border=16,
                             subd_neg=-8,maxpool_pos=True).to(self.device)
-        self.criterionAUX = MultiLoss(1, ReliabilityLoss(self.sampler, base=0.5, nq=20),
+        if not self.args.disable_reliability:
+            self.criterionAUX = MultiLoss(1, ReliabilityLoss(self.sampler, base=self.args.kappa, nq=20),
+                                        1, CosimLoss(N=self.args.N),
+                                        1, PeakyLoss(N=self.args.N)).to(self.device)
+        else:
+            self.criterionAUX = MultiLoss(1, PixelAPLoss(self.sampler, nq=20),
                                         1, CosimLoss(N=self.args.N),
                                         1, PeakyLoss(N=self.args.N)).to(self.device)
         if for_training:

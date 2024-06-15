@@ -40,6 +40,8 @@ def parse_arguments():
     parser.add_argument('--multi_aug_eval', action="store_true")
     parser.add_argument("--exclude_val_region",action="store_true")
     parser.add_argument("--N", type=int, default=16, help="patch size for repeatability")
+    parser.add_argument("--kappa", type=float, default=0.5)
+    parser.add_argument("--disable_reliability", action="store_true")
     parser.add_argument("--reliability-thr", type=float, default=0.7)
     parser.add_argument("--repeatability-thr", type=float, default=0.7)
     
