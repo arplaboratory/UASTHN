@@ -398,6 +398,10 @@ def parse_arguments():
         default="default",
         help="Folder name of the current run (saved in ./logs/)",
     )
+    parser.add_argument(
+        "--output_pairs",
+        action="store_true"
+    )
     args = parser.parse_args()
 
     if args.datasets_folder == None:
