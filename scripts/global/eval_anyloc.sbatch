@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=1                # uses 1 compute core per task
 #SBATCH --time=9:00:00
 #SBATCH --gres=gpu:a100:1
-#SBATCH --mem=100GB
+#SBATCH --mem=200GB
 #SBATCH --job-name=eval_thermal
 
 eval "$(conda shell.bash hook)"
