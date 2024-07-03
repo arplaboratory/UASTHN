@@ -67,6 +67,7 @@ def parse_arguments():
     parser.add_argument('--ue_dropout', type=float, default=0.0)
     parser.add_argument('--ue_combine', type=str, default="min", choices=["min", "add", "max"])
     parser.add_argument("--generate_test_pairs", action='store_true')
+    parser.add_argument("--load_test_pairs", type=str, default=None)
     parser.add_argument("--check_step", type=int, default=-1, choices=[-1,0,1,2,3,4,5])
     parser.add_argument("--neg_training", action="store_true")
     parser.add_argument("--neg_margin", type=float, default=2.0)
