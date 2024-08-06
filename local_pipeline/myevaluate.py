@@ -21,6 +21,7 @@ from os.path import join
 import commons
 import logging
 import wandb
+from sklearn.metrics import roc_curve, roc_auc_score
 
 def load_model(args, model):
     if args.first_stage_ue and args.ue_method == "ensemble":
@@ -91,6 +92,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     total_flow = torch.empty(0)
     total_ce = torch.empty(0)
     total_ue_mask = torch.empty(0, len(args.ue_rej_std))
+    total_ue_value = torch.empty(0)
     timeall=[]
     if args.generate_test_pairs:
         test_pairs = torch.zeros(len(val_dataset.dataset), dtype=torch.long)
@@ -157,6 +159,14 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
                 model_eval = model
             ue_std = model_eval.std_four_pred_five_crops.view(model_eval.std_four_pred_five_crops.shape[0], -1)
             ue_mask_list = []
+            if args.ue_std_method == "any":
+                ue_value = torch.max(ue_std, dim=1)[0].cpu()
+            elif args.ue_std_method == "all":
+                ue_value = torch.min(ue_std, dim=1)[0].cpu()
+            elif args.ue_std_method == "mean":
+                ue_value = torch.mean(ue_std, dim=1).cpu()
+            else:
+                raise NotImplementedError()
             for j in range(len(args.ue_rej_std)):
                 if args.ue_std_method == "any":
                     ue_mask_rej = torch.any(ue_std > args.ue_rej_std[j], dim=1).cpu()
@@ -172,7 +182,7 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         else:
             model_eval = model
         total_ue_mask = torch.cat([total_ue_mask, ue_mask], dim=0)
-        
+        total_ue_value = torch.cat([total_ue_value, ue_value], dim=0)
         total_mace = torch.cat([total_mace,mace_vec], dim=0)
         
         # CE
@@ -239,6 +249,25 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
             wandb.log({f"test_mace_{j}": final_mace})
             wandb.log({f"test_ce_{j}": final_ce})
             wandb.log({f"success_rate_{j}": final_ue_mask})
+    # plot ROC using ue_value for MACE > 25.0 m
+    y_label_0 = torch.zeros(len(total_mace)).long()
+    y_label_0[total_mace > 4.167] = 1
+    fpr0, tpr0, _ = roc_curve(y_label_0, total_ue_value)
+    auc0 = roc_auc_score(y_label_0, total_ue_value)
+    plt.figure(figsize=(8, 8))
+    plt.plot(fpr0, tpr0, 'g', label = 'MACE > 20.0 m: AUC = %0.2f' % auc0)
+    plt.title('STHN two-stage: D_C = 512m')
+    plt.legend(loc = 'lower right')
+    plt.plot([0, 1], [0, 1], 'r--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.tight_layout()
+    plt.savefig(args.save_dir + "/ROC.png", bbox_inches='tight')
+    np.save(args.save_dir + "/fpr0.npy", fpr0)
+    np.save(args.save_dir + "/tpr0.npy", tpr0)
+    
     logging.info(np.mean(np.array(timeall[1:-1])))
     io.savemat(args.save_dir + '/resmat', {'matrix': total_mace.numpy()})
     np.save(args.save_dir + '/resnpy.npy', total_mace.numpy())
