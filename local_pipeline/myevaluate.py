@@ -225,10 +225,10 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
         #             save_overlap_bbox_img(model_eval.image_1_multi, model_eval.fake_warped_image_2_multi_before, save_dir + f'/train_overlap_bbox_before_recover_{i_batch}.png', four_point_gt_multi, four_point_1_multi)
         #             save_overlap_bbox_img(model_eval.image_1_multi, model_eval.fake_warped_image_2_multi_after, save_dir + f'/train_overlap_bbox_after_recover_{i_batch}.png', four_point_gt_multi, four_point_1_multi)
     for j in range(total_ue_mask.shape[1]):
-        ue_mask_single = total_ue_mask[:,j]
+        ue_mask_single = total_ue_mask[:,j].bool()
         final_ue_mask = torch.count_nonzero(ue_mask_single)/len(ue_mask_single)
-        final_mace = torch.mean(total_mace * ue_mask_single).item()
-        final_ce = torch.mean(total_ce * ue_mask_single).item()
+        final_mace = torch.mean(total_mace[ue_mask_single]).item()
+        final_ce = torch.mean(total_ce[ue_mask_single]).item()
         logging.info(f"MACE Metric {j}: {final_mace}")
         logging.info(f'CE Metric {j}: {final_ce}')
         logging.info(f'Success rate {j}:{final_ue_mask}')
