@@ -292,7 +292,7 @@ class MYDATA(homo_dataset):
             datasets_folder, dataset_name, split + "_database.h5"
         )
         self.database_folder_map_path = join(
-            datasets_folder, "20201117_west_of_rimah", "20201117_west_of_rimah_BingSatellite.tif"
+            datasets_folder, "maps/satellite/20201117_BingSatellite.png"
         )
         self.database_folder_map_df = F.to_tensor(Image.open(self.database_folder_map_path))
         self.queries_folder_h5_path = join(

@@ -265,8 +265,16 @@ def evaluate_SNet(model, val_dataset, batch_size=0, args = None, wandb_log=False
     plt.ylabel('True Positive Rate')
     plt.tight_layout()
     plt.savefig(args.save_dir + "/ROC.png", bbox_inches='tight')
+    plt.close()
     np.save(args.save_dir + "/fpr0.npy", fpr0)
     np.save(args.save_dir + "/tpr0.npy", tpr0)
+
+    plt.figure(figsize=(8, 8))
+    plt.hist(x, density=True, bins=30)  # density=False would make counts
+    plt.ylabel('Frequency')
+    plt.xlabel('Data')
+    plt.savefig(args.save_dir + "/hist.png", bbox_inches='tight')
+    plt.close()
     
     logging.info(np.mean(np.array(timeall[1:-1])))
     io.savemat(args.save_dir + '/resmat', {'matrix': total_mace.numpy()})
