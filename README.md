@@ -17,6 +17,8 @@ Maintainer: Jiuhong Xiao (jx1190@nyu.edu)<br />**
 ## Dataset
 We modify the Boson-nighttime dataset from [STGL](https://github.com/arplaboratory/satellite-thermal-geo-localization/tree/main) and [STHN](https://github.com/arplaboratory/STHN) to use the entire satellite map instead of h5 files. Now you can use center coordinates and image width to crop the satellite images from the map so that the dataset size is reduced and the crop width is flexible. Thermal images are still in h5 files because we haven't found a way to stitch the generated thermal images into one map appropriately.
 
+The raw resolution of the thermal images is 768x768, allowing for data augmentation (e.g., resizing and rotation) without introducing black padding. For training, we crop the central 512x512 region in the dataloader after augmentation.
+
 Dataset link (957 GB): [Download](https://drive.google.com/drive/folders/1HRUlR-X9u3VfWtSwh19DsvPIYU5Q3TPG?usp=sharing)
 
 The ``datasets`` folder should be created in the root folder with the following structure.
