@@ -15,17 +15,15 @@ Affiliation: [NYU ARPL](https://wp.nyu.edu/arpl/)<br />
 Maintainer: Jiuhong Xiao (jx1190@nyu.edu)<br />**
 
 ## Dataset
-We extend the Boson-nighttime dataset from [STGL](https://github.com/arplaboratory/satellite-thermal-geo-localization/tree/main) with additional unpaired satellite images and our generated thermal images using TGM.
+We modify the Boson-nighttime dataset from [STGL](https://github.com/arplaboratory/satellite-thermal-geo-localization/tree/main) and [STHN](https://github.com/arplaboratory/STHN) to use the entire satellite map instead of h5 files. Now you can use center coordinates and image width to crop the satellite images from the map so that the dataset size is reduced and the crop width is flexible. Thermal images are still in h5 files because we haven't found a way to stitch the generated thermal images into one map appropriately.
 
 Dataset link (957 GB): [Download](https://drive.google.com/drive/folders/1HRUlR-X9u3VfWtSwh19DsvPIYU5Q3TPG?usp=sharing)
 
-The ``datasets`` folder should be created in the root folder with the following structure. By default, the dataset uses $W_S=512$, while the ``larger`` suffix indicates $W_S=1536$.
+The ``datasets`` folder should be created in the root folder with the following structure.
 
 ```
-STHN/datasets/
-├── satellite_0_satellite_0_dense
-│   └── train_database.h5
-├── satellite_0_satellite_0_dense_larger_ori
+UASTHN/datasets/
+├── satellite_0_satellite_0
 │   └── train_database.h5
 ├── satellite_0_thermalmapping_135
 │   ├── test_database.h5
@@ -34,34 +32,14 @@ STHN/datasets/
 │   ├── train_queries.h5
 │   ├── val_database.h5
 │   └── val_queries.h5
-├── satellite_0_thermalmapping_135_larger_ori
-│   ├── test_database.h5
-│   ├── train_database.h5
-│   └── val_database.h5
-├── satellite_0_thermalmapping_135_larger_ori_train
-│   ├── test_database.h5 -> ../satellite_0_thermalmapping_135_larger_ori/test_database.h5
-│   ├── test_queries.h5 -> ../satellite_0_thermalmapping_135/test_queries.h5
-│   ├── train_database.h5 -> ../satellite_0_thermalmapping_135_larger_ori/train_database.h5
-│   ├── train_queries.h5 -> ../satellite_0_thermalmapping_135/train_queries.h5
-│   ├── val_database.h5 -> ../satellite_0_thermalmapping_135_larger_ori/val_database.h5
-│   └── val_queries.h5 -> ../satellite_0_thermalmapping_135/val_queries.h5
-├── satellite_0_thermalmapping_135_nocontrast_dense_exclusion
-│   ├── extended_database.h5 -> ../satellite_0_satellite_0_dense/train_database.h5
+├── satellite_0_thermalmapping_135_train
+│   ├── extended_database.h5 -> ../satellite_0_satellite_0/train_database.h5
 │   ├── extended_queries.h5
 │   ├── test_database.h5 -> ../satellite_0_thermalmapping_135/test_database.h5
 │   ├── test_queries.h5 -> ../satellite_0_thermalmapping_135/test_queries.h5
 │   ├── train_database.h5 -> ../satellite_0_thermalmapping_135/train_database.h5
 │   ├── train_queries.h5 -> ../satellite_0_thermalmapping_135/train_queries.h5
 │   ├── val_database.h5 -> ../satellite_0_thermalmapping_135/val_database.h5
-│   └── val_queries.h5 -> ../satellite_0_thermalmapping_135/val_queries.h5
-├── satellite_0_thermalmapping_135_nocontrast_dense_exclusion_larger_ori_train
-│   ├── extended_database.h5 -> ../satellite_0_satellite_0_dense_larger_ori/train_database.h5
-│   ├── extended_queries.h5 -> ../satellite_0_thermalmapping_135_nocontrast_dense_exclusion/extended_queries.h5
-│   ├── test_database.h5 -> ../satellite_0_thermalmapping_135_larger_ori/test_database.h5
-│   ├── test_queries.h5 -> ../satellite_0_thermalmapping_135/test_queries.h5
-│   ├── train_database.h5 -> ../satellite_0_thermalmapping_135_larger_ori/train_database.h5
-│   ├── train_queries.h5 -> ../satellite_0_thermalmapping_135/train_queries.h5
-│   ├── val_database.h5 -> ../satellite_0_thermalmapping_135_larger_ori/val_database.h5
 │   └── val_queries.h5 -> ../satellite_0_thermalmapping_135/val_queries.h5
 ```
 
