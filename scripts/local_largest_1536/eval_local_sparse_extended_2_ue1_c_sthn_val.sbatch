@@ -10,7 +10,7 @@
 #SBATCH --output=eval_local.out
 
 eval "$(conda shell.bash hook)"
-conda activate UAGL
+conda activate UASTHN
 
 CROP=$SLURM_ARRAY_TASK_ID
 

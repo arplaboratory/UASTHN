@@ -2,7 +2,7 @@ import numpy as np
 import os
 import torch
 import argparse
-from model.network import UAGL
+from model.network import UASTHN
 from utils import save_overlap_img, save_img, setup_seed, save_overlap_bbox_img
 import datasets_4cor_img as datasets
 import scipy.io as io
@@ -63,16 +63,16 @@ def load_model(args, model):
 def test(args, wandb_log):
     if not args.identity:
         if not args.ue_method == "augment_ensemble":
-            model = UAGL(args)
+            model = UASTHN(args)
             model = load_model(args, model)
         else:
             model = []
             args.ue_method = "augment"
-            model_single = UAGL(args)
+            model_single = UASTHN(args)
             model_single = load_model(args, model_single)
             model.append(model_single)
             args.ue_method = "ensemble"
-            model_single = UAGL(args)
+            model_single = UASTHN(args)
             model_single = load_model(args, model_single)
             model.append(model_single)
             args.ue_method = "augment_ensemble"
@@ -306,5 +306,5 @@ if __name__ == '__main__':
     logging.debug(args)
     wandb_log = True
     if wandb_log:
-        wandb.init(project="UAGL-eval", entity="xjh19971", config=vars(args))
+        wandb.init(project="UASTHN-eval", entity="xjh19971", config=vars(args))
     test(args, wandb_log)

@@ -9,7 +9,7 @@ import torchvision
 from torch.cuda.amp import GradScaler
 from tqdm import tqdm
 
-from model.network import UAGL
+from model.network import UASTHN
 from utils import count_parameters, save_img, save_overlap_img, setup_seed, warp
 import commons
 from os.path import join
@@ -23,7 +23,7 @@ import logging
 from myevaluate import evaluate_SNet
 
 def main(args):
-    model = UAGL(args, for_training=True)
+    model = UASTHN(args, for_training=True)
     logging.info(f"Parameter Count: {count_parameters(model.netG)}")
 
     if args.restore_ckpt is not None:
@@ -191,6 +191,6 @@ if __name__ == "__main__":
     commons.setup_logging(args.save_dir, console='info')
     setup_seed(args.seed)
 
-    wandb.init(project="UAGL", entity="xjh19971", config=vars(args))
+    wandb.init(project="UASTHN", entity="xjh19971", config=vars(args))
         
     main(args)

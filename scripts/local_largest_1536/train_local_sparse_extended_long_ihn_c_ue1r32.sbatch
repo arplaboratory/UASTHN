@@ -9,6 +9,6 @@
 #SBATCH --output=train_local.out
 
 eval "$(conda shell.bash hook)"
-conda activate UAGL
+conda activate UASTHN
 
 python3 ./local_pipeline/train_4cor.py --dataset_name satellite_0_thermalmapping_135_train --val_positive_dist_threshold $DC --database_size 1536 --num_steps 200000 --corr_level 4  --first_stage_ue --batch_size 8 --ue_aug_method shift --ue_shift 32 --ue_num_crops 5 --ue_shift_crops_types random --exclude_val_region --ue_agg zero --lr 5e-5 --restore_ckpt logs/local_he/$MODEL/UAGL.pth
