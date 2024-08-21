@@ -19,12 +19,15 @@ We modify the Boson-nighttime dataset from [STGL](https://github.com/arplaborato
 
 The raw resolution of the thermal images is 768x768, allowing for data augmentation (e.g., resizing and rotation) without introducing black padding. For training, we crop the central 512x512 region in the dataloader after augmentation.
 
-Dataset link (957 GB): [Download](https://drive.google.com/drive/folders/1HRUlR-X9u3VfWtSwh19DsvPIYU5Q3TPG?usp=sharing)
+Dataset link (122 GB): [Download](https://drive.google.com/drive/folders/1edQ8ZMXZJHjXe3qDR4Y9m4FxRbGsTz0Q)
 
 The ``datasets`` folder should be created in the root folder with the following structure.
 
 ```
 UASTHN/datasets/
+├── maps
+│   └── satellite
+|   |   └── 20201117_BingSatellite.png
 ├── satellite_0_satellite_0
 │   └── train_database.h5
 ├── satellite_0_thermalmapping_135
