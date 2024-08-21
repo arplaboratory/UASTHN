@@ -38,9 +38,15 @@ sbatch --export=ALL,DC=128,MODEL=$MODEL_FOLDER scripts/local_largest_1536/train_
 # DM
 # One-stage models
 # Change MODEL_FOLDER to the folder of the base model
-sbatch --export=ALL,DC=512,MODEL=$MODEL_FOLDER scripts/local_largest_1536/train_local_sparse_extended_long_ihn_d.sbatch
-sbatch --export=ALL,DC=256,MODEL=$MODEL_FOLDER scripts/local_largest_1536/train_local_sparse_extended_long_ihn_d.sbatch
-sbatch --export=ALL,DC=128,MODEL=$MODEL_FOLDER scripts/local_largest_1536/train_local_sparse_extended_long_ihn_d.sbatch
+sbatch --export=ALL,DC=512 scripts/local_largest_1536/train_local_sparse_extended_long_ihn_d.sbatch
+sbatch --export=ALL,DC=256 scripts/local_largest_1536/train_local_sparse_extended_long_ihn_d.sbatch
+sbatch --export=ALL,DC=128 scripts/local_largest_1536/train_local_sparse_extended_long_ihn_d.sbatch
+
+# Two-stage models
+# Change MODEL_FOLDER to the folder of the base model
+sbatch --export=ALL,DC=512,MODEL=$MODEL_FOLDER scripts/local_largest_1536/train_local_sparse_extended_long_load_f_aug64_sthn_d.sbatch
+sbatch --export=ALL,DC=256,MODEL=$MODEL_FOLDER scripts/local_largest_1536/train_local_sparse_extended_long_load_f_aug64_sthn_d.sbatch
+sbatch --export=ALL,DC=128,MODEL=$MODEL_FOLDER scripts/local_largest_1536/train_local_sparse_extended_long_load_f_aug64_sthn_d.sbatch
 
 # DE
 # Use the models trained in step 1 and 2. Put trained models in local_pipeline/ensembles
