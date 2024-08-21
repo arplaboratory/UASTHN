@@ -102,10 +102,13 @@ submit_job_baseline() {
 
     if [ "$METHOD" = 1 ]
     then
-        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_extended_2_val.sbatch"
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_extended_2_sthn_val.sbatch"
     elif [ "$METHOD" = 2 ]
     then
-        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_extended_2.sbatch"
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_extended_2_sthn.sbatch"
+    elif [ "$METHOD" = 3 ]
+    then
+        local EVAL_SCRIPT="scripts/local_largest_1536/eval_local_sparse_extended_2_ihn.sbatch"
     else
         exit 0
     fi
