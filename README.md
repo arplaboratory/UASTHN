@@ -55,7 +55,7 @@ conda env create -f env.yml
 ```
 
 ## Training
-You can find the single training and evaluation scripts in the ``scripts/local_largest_1536`` folder.  
+You can find the single training and evaluation scripts in the ``scripts/local_largest_1536`` folder. The scripts are for slurm system to submit sbatch job. You can also directly run the script with bash.
 For training, please refer to ``train_local_ue.sh`` and change necessary arguments, such as $MODEL_FOLDER.
 
 After training, find your model folder in ``./logs/local_he/$dataset_name-$datetime-$uuid``.
