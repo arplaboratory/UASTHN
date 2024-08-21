@@ -15,7 +15,7 @@ import torchvision
 import random
 import time
 import logging
-from model.baseline import DHN, LocalTrans
+from model.baseline import DHN
 import datasets_4cor_img as datasets
 import numpy as np
 
@@ -197,7 +197,6 @@ class IHN(nn.Module):
 
 arch_list = {"IHN": IHN,
              "DHN": DHN,
-             "LocalTrans": LocalTrans,
              }
 
 class UASTHN():
