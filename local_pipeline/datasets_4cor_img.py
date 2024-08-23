@@ -332,11 +332,11 @@ class MYDATA(homo_dataset):
         self.database_utms = np.array(
             [(path.split("@")[1], path.split("@")[2])
              for path in self.database_paths]
-        ).astype(np.float)
+        ).astype(float)
         self.queries_utms = np.array(
             [(path.split("@")[1], path.split("@")[2])
              for path in self.queries_paths]
-        ).astype(np.float)
+        ).astype(float)
 
         # Find soft_positives_per_query, which are within val_positive_dist_threshold (deafult 25 meters)
         knn = NearestNeighbors(n_jobs=-1)
