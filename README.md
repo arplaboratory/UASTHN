@@ -92,12 +92,10 @@ Download pretrained models with CropTTA: [Download](https://drive.google.com/dri
 </details>
 
 <details>
-  <summary>MACE histogram</summary>
+  <summary>ROC curves and MACE histogram</summary>
   Here are the ROC curve and MACE histogram for different values of $D_C$. These results indicate that our uncertainty estimation method performs well when $D_C$ is large, and the model exhibits a long-tail error distribution.
   
-  ![image](https://github.com/arplaboratory/UASTHN/assets/grid_random_5_10_roc.png)
-  
-  ![image](https://github.com/arplaboratory/UASTHN/assets/grid_random_5_10_hist.png)
+  <img src="https://github.com/arplaboratory/UASTHN/blob/master/assets/grid_random_5_10_roc.png" width=40% height=40%><img src="https://github.com/arplaboratory/UASTHN/blob/master/assets/grid_random_5_10_hist.png" width=40% height=40%>
 
 
   
