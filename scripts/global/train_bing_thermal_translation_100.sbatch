@@ -9,6 +9,6 @@
 #SBATCH --output=train_tgm.out
 
 eval "$(conda shell.bash hook)"
-conda activate UAGL
+conda activate UASTHN
 
 python3 global_pipeline/train_pix2pix.py --dataset_name=satellite_0_thermalmapping_135 --datasets_folder=datasets --train_batch_size 32 --lr 0.0002 --patience 40 --epochs_num 60 --G_net unet --G_loss_lambda 100.0 --D_net patchGAN --GAN_save_freq 5 --GAN_resize 768 768 --GAN_epochs_decay 20 --G_contrast manual --num_workers 16

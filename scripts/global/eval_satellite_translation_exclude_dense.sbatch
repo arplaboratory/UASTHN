@@ -9,6 +9,6 @@
 #SBATCH --output=generate_extended.out
 
 eval "$(conda shell.bash hook)"
-conda activate UAGL
+conda activate UASTHN
 
 python3 global_pipeline/eval_pix2pix_generate_h5_exclude.py --resume='logs/default/'$1'/best_model.pth' --dataset_name=satellite_0_satellite_0_dense_largest_ori --datasets_folder ./datasets --G_net unet --GAN_upsample bilinear --GAN_resize 512 512 --resize 768 768

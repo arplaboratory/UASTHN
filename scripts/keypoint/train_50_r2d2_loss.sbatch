@@ -9,6 +9,6 @@
 #SBATCH --output=train_keypoint.out
 
 eval "$(conda shell.bash hook)"
-conda activate UAGL
+conda activate UASTHN
 
 python3 ./keypoint_pipeline/myr2d2/train_key.py --dataset_name satellite_0_thermalmapping_135 --val_positive_dist_threshold 50 --database_size 512 --num_steps 200000 --disable_reliability --batch_size 8

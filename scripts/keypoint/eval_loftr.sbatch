@@ -9,6 +9,6 @@
 #SBATCH --output=eval_keypoint.out
 
 eval "$(conda shell.bash hook)"
-conda activate UAGL
+conda activate UASTHN
 
 python3 ./keypoint_pipeline/myloftr/myevaluate.py --dataset_name satellite_0_thermalmapping_135 --eval_model logs/local_key/test --val_positive_dist_threshold 50 --database_size 512 --batch_size 1 --test

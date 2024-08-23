@@ -8,7 +8,7 @@
 #SBATCH --job-name=eval_thermal
 
 eval "$(conda shell.bash hook)"
-conda activate UAGL
+conda activate UASTHN
 
 python3 global_pipeline/eval.py --resume='logs/global_retrieval/'$1'/best_model.pth' --dataset_name=satellite_0_thermalmapping_135_dense --datasets_folder ./datasets --aggregation gem --infer_batch_size 16 --backbone $2 --fc_output_dim $3 --G_contrast $4
 
