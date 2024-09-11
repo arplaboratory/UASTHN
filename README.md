@@ -3,9 +3,8 @@
 This is the official repository for [UASTHN: Uncertainty-Aware Deep Homography Estimation for UAV Satellite-Thermal Geo-localization]().
 
 Related works:  
-1. Long-range UAV Thermal Geo-localization with Satellite Imagery [[Paper]](https://arxiv.org/abs/2306.02994) [[Code]](https://github.com/arplaboratory/satellite-thermal-geo-localization)
-2. STHN: Deep Homography Estimation for UAV Thermal Geo-localization with Satellite Imagery [[Paper]](https://arxiv.org/abs/2405.20470) [[Code]](https://github.com/arplaboratory/STHN)
-
+* Long-range UAV Thermal Geo-localization with Satellite Imagery [[Project]](https://xjh19971.github.io/STGL)
+* STHN: Deep Homography Estimation for UAV Thermal Geo-localization with Satellite Imagery [[Project]](https://xjh19971.github.io/STHN)
 
 ```
 bibtex TBD
@@ -19,7 +18,7 @@ We modify the Boson-nighttime dataset from [STGL](https://github.com/arplaborato
 
 The raw resolution of the thermal images is 768x768, allowing for data augmentation (e.g., resizing and rotation) without introducing black padding. For training, we crop the central 512x512 region in the dataloader after augmentation.
 
-Dataset link (122 GB): [Download](https://drive.google.com/drive/folders/1edQ8ZMXZJHjXe3qDR4Y9m4FxRbGsTz0Q)
+Dataset link (122 GB): [Download](https://huggingface.co/datasets/xjh19972/boson-nighttime/tree/main/satellite-thermal-dataset-v3)
 
 The ``datasets`` folder should be created in the root folder with the following structure.
 
