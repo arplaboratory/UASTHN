@@ -1,6 +1,6 @@
 # UASTHN: Uncertainty-Aware Deep Homography Estimation for UAV Satellite-Thermal Geo-localization
 
-This is the official repository for [UASTHN: Uncertainty-Aware Deep Homography Estimation for UAV Satellite-Thermal Geo-localization]().
+This is the official repository for [UASTHN: Uncertainty-Aware Deep Homography Estimation for UAV Satellite-Thermal Geo-localization](https://arxiv.org/abs/2502.01035).
 
 Related works:  
 * Long-range UAV Thermal Geo-localization with Satellite Imagery [[Project]](https://xjh19971.github.io/STGL)
