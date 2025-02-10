@@ -7,7 +7,12 @@ Related works:
 * STHN: Deep Homography Estimation for UAV Thermal Geo-localization with Satellite Imagery [[Project]](https://xjh19971.github.io/STHN)
 
 ```
-bibtex TBD
+@article{xiao2025uasthn,
+  title={UASTHN: Uncertainty-Aware Deep Homography Estimation for UAV Satellite-Thermal Geo-localization},
+  author={Xiao, Jiuhong and Loianno, Giuseppe},
+  journal={arXiv preprint arXiv:2502.01035},
+  year={2025}
+}
 ```
 **Developer: Jiuhong Xiao<br />
 Affiliation: [NYU ARPL](https://wp.nyu.edu/arpl/)<br />
