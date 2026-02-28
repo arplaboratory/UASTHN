@@ -1,5 +1,10 @@
 # UASTHN: Uncertainty-Aware Deep Homography Estimation for UAV Satellite-Thermal Geo-localization
 
+[![arXiv](https://img.shields.io/badge/arXiv-2502.01035-B31B1B.svg)](https://arxiv.org/abs/2502.01035)
+[![Hugging Face](https://img.shields.io/badge/Hugging%20Face%20Dataset-UASTHN-blue.svg)](https://huggingface.co/datasets/xjh19972/boson-nighttime/tree/main/satellite-thermal-dataset-v3)
+[![Hugging Face](https://img.shields.io/badge/Hugging%20Face%20Model-UASTHN-blue.svg)](https://huggingface.co/xjh19972/UASTHN)
+[![Model](https://img.shields.io/badge/Resources-UASTHN-green.svg)](https://drive.google.com/drive/folders/1cEH8vXzt0TMrJ6_SVaJwv4GxWYdWduZw?usp=sharing)
+
 This is the official repository for [UASTHN: Uncertainty-Aware Deep Homography Estimation for UAV Satellite-Thermal Geo-localization](https://arxiv.org/abs/2502.01035).
 
 Related works:  
@@ -18,9 +23,22 @@ Related works:
   keywords={Location awareness;Uncertainty;Satellites;Measurement uncertainty;Estimation;Autonomous aerial vehicles;Thermal noise;Robustness;Noise measurement;Robotics and automation},
   doi={10.1109/ICRA55743.2025.11128423}}
 ```
-**Developer: Jiuhong Xiao<br />
-Affiliation: [NYU ARPL](https://wp.nyu.edu/arpl/)<br />
-Maintainer: Jiuhong Xiao (jx1190@nyu.edu)<br />**
+
+## Conda Environment Setup
+Our repository requires a conda environment. Relevant packages are listed in ``env.yml``. Run the following command to setup the conda environment.
+```
+conda env create -f env.yml
+```
+
+## Simple Inference Demo
+
+To quickly get started with UASTHN, we provide a [`UASTHN_demo.py`](STHN_demo.py) script. This demo automatically downloads the model from Hugging Face and runs inference on a pair of sample images:
+
+```bash
+# From the UASTHN root directory
+conda activate UASTHN
+python UASTHN_demo.py
+```
 
 ## Dataset
 We modify the Boson-nighttime dataset from [STGL](https://github.com/arplaboratory/satellite-thermal-geo-localization/tree/main) and [STHN](https://github.com/arplaboratory/STHN) to use the entire satellite map instead of h5 files. Now you can use center coordinates and image width to crop the satellite images from the map so that the dataset size is reduced and the crop width is flexible. Thermal images are still in h5 files because we haven't found a way to stitch the generated thermal images into one map appropriately.
@@ -54,12 +72,6 @@ UASTHN/datasets/
 │   ├── train_queries.h5 -> ../satellite_0_thermalmapping_135/train_queries.h5
 │   ├── val_database.h5 -> ../satellite_0_thermalmapping_135/val_database.h5
 │   └── val_queries.h5 -> ../satellite_0_thermalmapping_135/val_queries.h5
-```
-
-## Conda Environment Setup
-Our repository requires a conda environment. Relevant packages are listed in ``env.yml``. Run the following command to setup the conda environment.
-```
-conda env create -f env.yml
 ```
 
 ## Training
